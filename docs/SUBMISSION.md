@@ -5,10 +5,12 @@
 
 ## Links
 - **Hosted project URL**: https://helm-294160018950.europe-west1.run.app
-  (one page — the whole product · diagram: `/architecture.svg`)
+  (one page — the whole product)
 - **Repository**: https://github.com/hyperdrift-io/helm (public)
 - **Protected asset (billing service)**: https://cargo-294160018950.europe-west1.run.app
-- **Architecture diagram**: `assets/architecture.svg` (also served live)
+- **Architecture**: `/architecture` — a live page lit by the real event stream,
+  so the diagram shows the crew moving rather than a drawing of it
+  (static SVG also at `/architecture.svg` and `assets/architecture.svg`)
 
 ## Google stack (required)
 - **Gemini 3.5 Flash** via Vertex AI — every decision in every cycle
@@ -60,11 +62,13 @@ surface. Helm treats anything instruction-shaped in a tool result as data to
 quarantine, never orders, and every quarantine is its own ledger record.
 
 **The page.** One page is the whole product. The orchestrator sits at the
-centre as a molecule — a gold hub, one node per service bonded to it — and
-every tool call an agent makes sends a light particle down that service's bond,
-so you watch decisions travel to the service they act on. Each card links to
-the real running app (these are live services, not sandboxes), carries its own
-generated artwork, and shows up to three live figures: PostHog's last hour for
+centre as a molecule — a burning core, one node per service bonded to it, each
+node a porthole onto that service's own artwork so you recognise it before you
+read the label. A node is rimmed green while it holds and washes red the moment
+a probe fails. Every tool call an agent makes sends a trailing light down that
+service's bond, so you watch decisions travel to the service they act on. Each
+card links to the real running app (these are live services, not sandboxes),
+carries the same artwork as its node, and shows up to three live figures: PostHog's last hour for
 the production apps — visitors, events, errors — and probe latency, requests
 per minute and real Cloud Run capacity for the drill assets. Nothing is
 invented: when a scan is unavailable the figure reads "—" and the card says
