@@ -84,7 +84,10 @@ h2 { font-size:.72rem; text-transform:uppercase; letter-spacing:.18em;
 .card.flipped .flip { transform:rotateY(180deg); }
 .face { position:absolute; inset:0; backface-visibility:hidden; border:1px solid var(--line);
         background:linear-gradient(160deg,var(--raise),var(--panel)); padding:.9rem 1rem;
-        display:flex; flex-direction:column; }
+        display:flex; flex-direction:column; overflow:hidden; }
+.face.front { background-repeat:no-repeat; background-position:center;
+              background-size:cover; transition:background-size .8s ease; }
+.card:hover .face.front, .card.hot .face.front { background-size:112%; }
 .face.back { transform:rotateY(180deg); }
 .card:hover .face { border-color:#2b3f4d; }
 .card.hot .face { border-color:var(--gold); box-shadow:0 0 0 1px rgba(216,160,61,.18); }
@@ -290,6 +293,9 @@ function buildCards(){
       '<div class="face back"><div class="title">'+s.app+'</div>'+
       '<div class="bar"><i></i></div><div class="steps"></div></div></div>';
     g.appendChild(c);
+    const front=c.querySelector('.face.front');
+    front.style.backgroundImage=
+      'linear-gradient(165deg,rgba(16,26,33,.62),rgba(10,16,21,.94)), url(art/'+s.app+'.jpg)';
     const acts=c.querySelector('.acts');
     for(const a of s.acts){
       const b=document.createElement('button');
@@ -352,7 +358,14 @@ function finish(app,msg){
 // one ledger stream feeds both the list and the active card's back
 const led=document.getElementById('ledger');
 let seen=0;
-function render(r){
+function activate(app){
+  if(!app || !APPS[app] || active===app) return;
+  active=app; seen=0;
+  const c=APPS[app];
+  c.card.classList.add('flipped'); c.steps.innerHTML=''; progress(app,8);
+  fire(app,true);
+}
+function render(r,live){
   const li=document.createElement('li'); li.dataset.kind=r.kind;
   let txt=r.kind;
   if(r.kind==='event') txt='EVENT  '+(r.event_desc||'');
@@ -364,6 +377,8 @@ function render(r){
   li.innerHTML='<time>'+(r.ts||'').slice(11,19)+'</time>'+txt.replace(/</g,'&lt;');
   led.prepend(li); while(led.children.length>120) led.lastChild.remove();
 
+  if(!live) return;                      // replayed history must not re-animate
+  if(r.kind==='cycle_start') activate((r.event||{}).app);
   if(!active || r.kind==='control') return;
   if(r.kind==='tool_call'){ seen++; progress(active,Math.min(90,10+seen*11));
     pulse(active);
@@ -374,8 +389,8 @@ function render(r){
     line(active,(r.verdict||'').split('VERDICT:').pop().trim().split('\n')[0]||'done','end');
     seen=0; finish(active, v?v[1]:'done'); }
 }
-fetch('recent').then(r=>r.json()).then(rs=>rs.forEach(render));
-new EventSource('stream').onmessage=e=>render(JSON.parse(e.data));
+fetch('recent').then(r=>r.json()).then(rs=>rs.forEach(r=>render(r,false)));
+new EventSource('stream').onmessage=e=>render(JSON.parse(e.data),true);
 
 fetch('crew').then(r=>r.json()).then(c=>{
   const t=document.getElementById('crew');
@@ -887,6 +902,19 @@ build();
 async def console() -> str:
     # one flagship page; /console kept as an alias
     return PAGE
+
+
+@app.get("/art/{name}.jpg")
+async def art(name: str):
+    from fastapi.responses import FileResponse, Response
+
+    if not name.replace("-", "").isalnum():
+        return Response("bad name", status_code=400)
+    p = os.path.join(os.path.dirname(__file__), "..", "assets", "art", name + ".jpg")
+    if os.path.exists(p):
+        return FileResponse(p, media_type="image/jpeg",
+                            headers={"Cache-Control": "public, max-age=3600"})
+    return Response("not found", status_code=404)
 
 
 @app.get("/architecture.svg")
