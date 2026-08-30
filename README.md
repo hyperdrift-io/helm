@@ -53,7 +53,10 @@ quarantine is itself a ledger record. (Production path: GEAP Model Armor.)
 - **Firestore** — the ledger: every event, tool call, quarantine and verdict
 
 Events come from watchers (steady probes of the live fleet — state *changes*
-wake Helm, not timers), the `/webhook` endpoint, and the drill button.
+wake Helm, not timers), a product-signal watcher (PostHog exception spikes
+across the apps), the `/webhook` endpoint, and the drill button. The Watch
+Officer reads real product telemetry (`get_app_signals`: traffic, exceptions,
+visitors — last 24h vs prior) to judge user impact before the crew acts.
 
 ## Spin up
 
