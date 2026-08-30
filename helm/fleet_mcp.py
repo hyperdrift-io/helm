@@ -1,0 +1,133 @@
+"""Fleet MCP — the tool surface Helm acts through.
+
+A standalone MCP server (stdio) exposing the Hyperdrift fleet to any MCP
+client: this repo's ADK agent, a Claude/ChatGPT session, or a future Crew
+tenant. The orchestrator is just the first automated client.
+
+Run directly: python -m helm.fleet_mcp
+"""
+
+from __future__ import annotations
+
+import json
+import os
+import re
+import time
+
+import httpx
+from mcp.server.fastmcp import FastMCP
+
+# Armor screen: text fetched from the network is data, never orders. Anything
+# instruction-shaped in a probe result is quarantined before it reaches the
+# model, and the quarantine is logged. (Production path: GEAP Model Armor.)
+_INJECTION = re.compile(
+    r"ignore (all |any )?(previous|prior) instructions|disregard your instructions"
+    r"|report .{0,20}healthy|take no action|you are now|system notice",
+    re.IGNORECASE,
+)
+
+
+def _screen(text: str, source: str) -> str:
+    if not _INJECTION.search(text):
+        return text
+    from helm import store
+
+    store.record("armor", source=source,
+                 quarantined=text[:160],
+                 note="instruction-shaped content in probe result quarantined")
+    return "[armor: quarantined instruction-shaped content from this response]"
+
+FLEET = {
+    "revela": {"url": "https://revela.club", "about": "photo-club product"},
+    "nextrole": {"url": "https://nextrole.site", "about": "CV / application helper"},
+    "intel": {"url": "https://intel.hyperdrift.io", "about": "market intel"},
+    "web3-capital": {"url": "https://web3.hyperdrift.io", "about": "DeFi analytics"},
+    "sandbox": {"url": os.environ.get("HELM_SANDBOX_URL", "http://localhost:8080/sandbox"),
+                "about": "drill target — a real service the red button really breaks"},
+}
+
+ISSUE_REPO = os.environ.get("HELM_ISSUE_REPO", "hyperdrift-io/helm")
+
+mcp = FastMCP("fleet")
+
+
+@mcp.tool()
+def get_fleet_status() -> str:
+    """Probe every live fleet app: HTTP status and latency, right now."""
+    out = {}
+    for name, app in FLEET.items():
+        t0 = time.monotonic()
+        try:
+            r = httpx.get(app["url"], timeout=8, follow_redirects=True)
+            out[name] = {"url": app["url"], "http": r.status_code,
+                         "latency_ms": round((time.monotonic() - t0) * 1000)}
+        except Exception as e:
+            out[name] = {"url": app["url"], "http": 0, "error": type(e).__name__}
+    return json.dumps(out)
+
+
+@mcp.tool()
+def get_app_detail(app: str) -> str:
+    """Deeper read of one app: headers, size, redirect chain — the scan we have."""
+    info = FLEET.get(app)
+    if not info:
+        return json.dumps({"error": f"unknown app '{app}'", "fleet": list(FLEET)})
+    try:
+        r = httpx.get(info["url"], timeout=8, follow_redirects=True)
+        return json.dumps({
+            "app": app, "about": info["about"], "http": r.status_code,
+            "bytes": len(r.content),
+            "server": r.headers.get("server", ""),
+            "cache": r.headers.get("cf-cache-status", r.headers.get("x-cache", "")),
+            "final_url": str(r.url),
+            "body_snippet": _screen(r.text[:300], source=f"{app} response body"),
+        })
+    except Exception as e:
+        return json.dumps({"app": app, "error": f"{type(e).__name__}: {e}"})
+
+
+@mcp.tool()
+def file_github_issue(title: str, body: str, labels: list[str] | None = None) -> str:
+    """File a real GitHub issue on the ops repo. Use for incidents that need
+    a human or a follow-up build; include evidence in the body."""
+    token = os.environ.get("GITHUB_TOKEN") or os.environ.get("GH_TOKEN")
+    if not token:
+        return json.dumps({"filed": False, "reason": "no GITHUB_TOKEN in environment"})
+    r = httpx.post(
+        f"https://api.github.com/repos/{ISSUE_REPO}/issues",
+        headers={"Authorization": f"Bearer {token}",
+                 "Accept": "application/vnd.github+json"},
+        json={"title": title, "body": body, "labels": labels or ["helm"]},
+        timeout=15,
+    )
+    if r.status_code >= 300:
+        return json.dumps({"filed": False, "status": r.status_code, "detail": r.text[:200]})
+    return json.dumps({"filed": True, "url": r.json()["html_url"]})
+
+
+@mcp.tool()
+def heal_service(app: str) -> str:
+    """Run the healing runbook for an app. Only apps with a wired runbook can
+    be healed; everything else needs a human — file an issue instead."""
+    if app != "sandbox":
+        return json.dumps({"healed": False,
+                           "reason": f"no automated runbook for '{app}' — escalate to a human"})
+    base = os.environ.get("HELM_SELF_URL", "http://localhost:8080")
+    try:
+        r = httpx.post(f"{base}/internal/heal", timeout=10)
+        return r.text
+    except Exception as e:
+        return json.dumps({"healed": False, "reason": f"{type(e).__name__}: {e}"})
+
+
+@mcp.tool()
+def get_recent_actions(limit: int = 15) -> str:
+    """What Helm has seen and done recently — read this before acting so
+    decisions build on prior ones instead of repeating them."""
+    from helm import store
+
+    return json.dumps(store.recent(limit))
+
+
+if __name__ == "__main__":
+    mcp.run()
