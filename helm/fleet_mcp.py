@@ -183,8 +183,33 @@ def _run_service_op(service: str, op: str, max_instances: int = 0) -> dict:
     elif op == "scale":
         svc.scaling.scaling_mode = run_v2.ServiceScaling.ScalingMode.AUTOMATIC
         svc.template.scaling.max_instance_count = max(1, min(int(max_instances), 10))
-    client.update_service(service=svc).result(timeout=120)
-    return {"done": True, "service": service, "op": op}
+    # submit and return — Cloud Run applies it in seconds; the agent verifies
+    # with get_service_config / get_app_detail rather than blocking here
+    client.update_service(service=svc)
+    return {"done": True, "service": service, "op": op,
+            "state": "submitted — verify with get_service_config in a moment"}
+
+
+@mcp.tool()
+def get_service_config(app: str) -> str:
+    """Read the live Cloud Run config of an operable service: ingress state
+    and max instances. Use to verify take_offline / bring_online / scale_service."""
+    if app not in _OPERABLE:
+        return json.dumps({"error": f"'{app}' is not an operable service"})
+    try:
+        from google.cloud import run_v2
+
+        client = run_v2.ServicesClient()
+        svc = client.get_service(
+            name=f"projects/{_PROJECT}/locations/{_REGION}/services/{app}")
+        return json.dumps({
+            "app": app,
+            "ingress": run_v2.IngressTraffic(svc.ingress).name,
+            "max_instances": svc.template.scaling.max_instance_count,
+            "url": svc.uri,
+        })
+    except Exception as e:
+        return json.dumps({"error": f"{type(e).__name__}: {e}"})
 
 
 @mcp.tool()

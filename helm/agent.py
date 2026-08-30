@@ -35,7 +35,7 @@ CREW = {
         "identity": "act-scoped",
         "tools": ["get_recent_actions", "get_app_detail", "heal_service",
                   "take_offline", "bring_online", "scale_service",
-                  "file_github_issue"],
+                  "get_service_config", "file_github_issue"],
         "duty": "run the runbook: heal, defend (offline under attack), scale "
                 "under surge, verify, file what needs a human",
     },
@@ -81,7 +81,10 @@ confirmed diagnosis. Runbooks by incident type:
   service to cut the attack surface, verify it is publicly unreachable, and file
   an incident issue; bring_online only on an explicit recovery event.
 - traffic surge (legitimate load): scale_service up (state the max_instances you
-  chose and why), verify the service still answers, and note the scale-back.
+  chose and why), verify with get_service_config that the new limit is live and
+  with get_app_detail that the service answers, and note the scale-back.
+Infrastructure ops return "submitted": wait a moment, then verify with
+get_service_config — that read is your proof, include it in the post-mortem.
 After a successful action file a short post-mortem issue (what happened, what
 you did, verification evidence). If the action failed, the app is outside your
 operable scope, or no runbook exists, file an incident issue for a human with
