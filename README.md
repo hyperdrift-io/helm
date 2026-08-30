@@ -15,6 +15,22 @@ load and the Engineer scales the actual service up, then proves it with a
 config read. The Engineer's infrastructure power is hard-allowlisted to the
 drill assets — the production fleet is structurally out of its reach.
 
+## Fleet console — flip a card, watch it stream
+
+`/console` is the HD flip-card console. Each card is a live app: press its
+command and the card flips the instant it fires, its back streaming the
+orchestrator's progress bar to completion while a toast confirms on both the
+console and the app itself. **cargo** flips with a real Cloud Run ingress cut
+(the public URL really dies and returns); **nextrole, intel, web3-capital**
+flip into a reversible maintenance overlay driven live over a per-app control
+channel. **revela is excluded — never operable.**
+
+Any app opts in with one line — `<script src="https://<helm>/control.js?app=nextrole"></script>`
+— and gains the live toast, progress bar, and maintenance overlay the
+orchestrator drives. `/demo-app?app=<name>` shows the app side without touching
+a production deployment. Streaming the steps is deliberate: the wait reads as
+live progress, not a spinner.
+
 ## The crew
 
 | Agent | Identity | Tools |
