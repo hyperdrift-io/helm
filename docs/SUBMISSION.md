@@ -5,7 +5,7 @@
 
 ## Links
 - **Hosted project URL**: https://helm-294160018950.europe-west1.run.app
-  (console: `/console` · incident bridge: `/` · diagram: `/architecture.svg`)
+  (one page — the whole product · diagram: `/architecture.svg`)
 - **Repository**: https://github.com/hyperdrift-io/helm (public)
 - **Protected asset (billing service)**: https://cargo-294160018950.europe-west1.run.app
 - **Architecture diagram**: `assets/architecture.svg` (also served live)
@@ -42,35 +42,44 @@ Cloud Run Admin API. That separation is enforced by construction: each agent's
 toolset is fixed by an MCP `tool_filter`, not by a prompt it might be talked
 out of. And the Engineer's power is hard-allowlisted to drill assets — ask it
 to take a production app offline and the tool itself refuses and escalates to
-a human.
+a human. Taking a service offline at all is reserved for an attack the
+diagnosis confirms: cutting a healthy service off from its users is the more
+expensive mistake, so a plain outage gets healed or escalated instead.
 
-**Real actions, not log lines.** Every control on the site causes a real
-effect a judge can reproduce. *Break* makes a service serve real 500s, with a
-prompt injection planted in the error page; the armor screen quarantines the
-injection before Gemini reads it, and the Engineer heals the service and
-verifies recovery. *Attack* storms the cargo billing service and the Engineer
-cuts its Cloud Run ingress — the public URL is dead in seconds. *Surge* floods
-it with real load and the Engineer raises the service's max instances, then
-proves it with a live config read rather than trusting the API's word.
+**Real actions, not log lines.** Every control on the site causes a real effect
+a judge can reproduce. *Break* makes a service serve real 500s with a prompt
+injection planted in the error page; the armor screen quarantines it before
+Gemini reads it, and the Engineer heals the service and verifies recovery.
+*Attack* storms the cargo billing service and the Engineer cuts its Cloud Run
+ingress — the public URL is dead in seconds. *Surge* floods it with real load
+and the Engineer raises max instances, then proves it with a live config read.
 
 **Why the injection beat matters.** An agent fleet reads its own telemetry, and
 telemetry carries text written by the outside world — so it is an attack
 surface. Helm treats anything instruction-shaped in a tool result as data to
 quarantine, never orders, and every quarantine is its own ledger record.
 
-**The console.** The orchestrator is the fleet's nervous system: a hub with a
-synapse to every app. Trigger a command and that synapse fires, the app's card
-flips, and progress streams step by step to completion — on the console *and*
-inside the app itself, which shows the same live toast and progress bar through
-a one-line control client. Streaming the steps is deliberate: the wait reads as
-live progress instead of a spinner.
+**The page.** One page is the whole product. The orchestrator sits at the
+centre as a molecule — a gold hub, one node per service bonded to it — and
+every tool call an agent makes sends a light particle down that service's bond,
+so you watch decisions travel to the service they act on. Each card links to
+the real running app (these are live services, not sandboxes), carries its own
+generated artwork, and shows up to three live figures: PostHog's last hour for
+the production apps — visitors, events, errors — and probe latency, requests
+per minute and real Cloud Run capacity for the drill assets. Nothing is
+invented: when a scan is unavailable the figure reads "—" and the card says
+why. Trigger a command and the bond fires, the card flips, and progress streams
+step by step to completion — on the page *and* inside the app itself, through a
+one-line control client. Then the numbers move: cut cargo's ingress and the
+next probe fails, so its card goes *down*; scale it and the capacity figure
+changes. Cycles the watchers raise on their own light the map the same way.
 
 **Architecture.** Watchers and webhooks raise events → the Commander routes →
 the Watch Officer diagnoses → the Engineer acts through the Fleet MCP → every
-event, tool call, quarantine and verdict lands on the Firestore ledger,
-streamed live to the bridge. The same code runs self-hosted with a jsonl
-ledger: the MCP tool surface is the contract, and ADK plus Gemini are its first
-automated client.
+event, tool call, quarantine and verdict lands on the Firestore ledger, so the
+audit trail survives a restart and streams live to the page. The same code runs
+self-hosted with a jsonl ledger: the MCP tool surface is the contract, and ADK
+plus Gemini are its first automated client.
 
 ## Spin-up instructions
 ```sh

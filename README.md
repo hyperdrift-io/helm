@@ -15,15 +15,44 @@ load and the Engineer scales the actual service up, then proves it with a
 config read. The Engineer's infrastructure power is hard-allowlisted to the
 drill assets — the production fleet is structurally out of its reach.
 
-## Fleet console — flip a card, watch it stream
+## One page — a molecule, and cards that carry real numbers
 
-`/console` is the HD flip-card console. Each card is a live app: press its
-command and the card flips the instant it fires, its back streaming the
-orchestrator's progress bar to completion while a toast confirms on both the
-console and the app itself. **cargo** flips with a real Cloud Run ingress cut
-(the public URL really dies and returns); **nextrole, intel, web3-capital**
-flip into a reversible maintenance overlay driven live over a per-app control
-channel. **revela is excluded — never operable.**
+Everything is on `/` (`/console` is an alias of the same page). The
+orchestrator is drawn as a molecule at the centre: a gold hub with orbiting
+electrons, one node per service bonded to it by a curved line. The nodes drift
+and the bonds flex with them. Every time an agent makes a tool call, a light
+particle travels down that service's bond — the orchestrator's signals
+propagating, one call at a time. The hub's electrons spin faster while a cycle
+is running. Hover a node and its card lights up, and the other way round; click
+a node and the page scrolls to its card. Under `prefers-reduced-motion` the
+drift and the particles stop.
+
+Five services are on the map and on the cards — cargo, sandbox, nextrole,
+intel and web3-capital (revela is watched, never operated). Each card carries
+its own abstract molecular artwork (generated with Recraft, in the Hyperdrift
+palette) behind a gradient scrim, a link to the running app, and up to three
+live figures.
+
+- **nextrole, intel, web3-capital** — real PostHog numbers for the last hour:
+  visitors, events, errors.
+- **cargo, sandbox** — probe latency and requests/min; cargo also shows its
+  real Cloud Run max-instance capacity, read from the Admin API.
+
+Nothing is invented. When a scan can't be made the figure reads `—` and the
+card says why ("analytics scan unavailable · no POSTHOG_API_KEY",
+"unreachable · ConnectError"). So a crew action has visible consequences on the
+card: cut cargo's ingress and the next probe fails, so latency turns to a dash
+and the card goes *down*; scale it and the capacity figure moves.
+
+Press a card's command and the card flips the instant it fires, its back
+streaming the orchestrator's progress bar to completion while a toast confirms
+on both the page and the app itself. **cargo** flips with a real Cloud Run
+ingress cut (the public URL really dies and returns); **nextrole, intel,
+web3-capital** flip into a reversible maintenance overlay driven live over a
+per-app control channel.
+
+The map answers to incidents nobody asked for, too: any cycle — including one a
+watcher raises on its own — activates that service's card and lights its bond.
 
 Any app opts in with one line — `<script src="https://<helm>/control.js?app=nextrole"></script>`
 — and gains the live toast, progress bar, and maintenance overlay the
@@ -42,6 +71,11 @@ live progress, not a spinner.
 Separation is enforced by construction, not by prompt: each agent gets its
 toolset through an MCP `tool_filter`. The Watch Officer *cannot* act; the
 Engineer *cannot* be reached except through a confirmed diagnosis.
+
+`take_offline` is reserved for an attack the diagnosis actually confirms —
+never a plain outage, a slow response, or an unexplained 5xx. Cutting a healthy
+service off from its users is the more expensive mistake, so the runbook heals
+or escalates instead.
 
 ## One cycle, on the ledger
 
@@ -70,8 +104,12 @@ quarantine is itself a ledger record. (Production path: GEAP Model Armor.)
   routing + `McpToolset` with per-agent tool filters
 - **Fleet MCP** (`helm/fleet_mcp.py`) — the tool surface, a standalone MCP
   server any client can use: this crew, a Claude/ChatGPT session, a human
+- **Card metrics** (`helm/metrics.py`) — every figure on a card: HTTP probes,
+  the Cloud Run config read, and PostHog's last hour, each behind a short cache
+  so the page can poll without hammering anything. No value is ever synthesised
 - **Cloud Run** — the bridge, the watchers, and the orchestration loop
-- **Firestore** — the ledger: every event, tool call, quarantine and verdict
+- **Firestore** — the ledger: every event, tool call, quarantine and verdict,
+  so the audit trail survives a restart
 
 Events come from watchers (steady probes of the live fleet — state *changes*
 wake Helm, not timers), a product-signal watcher (PostHog exception spikes
@@ -116,5 +154,6 @@ Gemini are its first automated client.
                        │             │                  issues    │
                        │             ▼                            │
                        │  Firestore ledger ──► bridge (SSE, live) │
+                       │  metrics.py ─► live figures on each card │
                        └──────────────────────────────────────────┘
 ```

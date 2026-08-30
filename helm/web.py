@@ -78,7 +78,7 @@ h2 { font-size:.72rem; text-transform:uppercase; letter-spacing:.18em;
 
 /* ---- cards ---- */
 #grid { display:grid; gap:1rem; grid-template-columns:repeat(auto-fill,minmax(16rem,1fr)); }
-.card { perspective:1400px; height:13.5rem; }
+.card { perspective:1400px; height:18.5rem; }
 .flip { position:relative; width:100%; height:100%; transition:transform .65s cubic-bezier(.2,.8,.2,1);
         transform-style:preserve-3d; }
 .card.flipped .flip { transform:rotateY(180deg); }
@@ -96,8 +96,19 @@ h2 { font-size:.72rem; text-transform:uppercase; letter-spacing:.18em;
 .dot { width:.55rem; height:.55rem; border-radius:50%; background:var(--dim); flex:none; }
 .dot.up { background:var(--ok); box-shadow:0 0 10px var(--ok); }
 .dot.down { background:var(--alert); box-shadow:0 0 10px var(--alert); }
-.role { color:var(--dim); font-size:.75rem; margin:.15rem 0 auto; }
-.acts { display:flex; flex-wrap:wrap; gap:.4rem; }
+.role { color:var(--dim); font-size:.75rem; margin:.15rem 0 0; }
+.figs { display:flex; gap:.5rem 1.1rem; margin:.55rem 0 .15rem; flex-wrap:wrap; }
+.figs span { display:flex; align-items:baseline; gap:.15rem; }
+.figs b { color:var(--ink); font-size:1rem; font-weight:400; }
+.figs i { color:var(--dim); font-style:normal; font-size:.7rem; }
+.figs em { color:var(--dim); font-style:normal; font-size:.68rem; letter-spacing:.08em;
+           text-transform:uppercase; margin-left:.3rem; }
+.figs.moved b { animation:tick .5s ease; }
+@keyframes tick { 0%{color:var(--gold);transform:translateY(-2px)} 100%{color:var(--ink)} }
+a.live { color:var(--dim); font-size:.72rem; text-decoration:none; border-bottom:1px solid var(--line);
+         align-self:flex-start; margin-bottom:.5rem; transition:color .25s,border-color .25s; }
+a.live:hover { color:var(--gold); border-color:var(--gold); }
+.acts { display:flex; flex-wrap:wrap; gap:.4rem; margin-top:auto; padding-top:.3rem; }
 button { font:inherit; font-size:.78rem; border:1px solid var(--alert); background:transparent;
          color:var(--alert); padding:.35rem .7rem; cursor:pointer; letter-spacing:.03em;
          transition:background .2s,color .2s; }
@@ -175,7 +186,7 @@ Cloud Run and Firestore run and remember it. The same code runs self-hosted.</fo
 <script>
 const SVGNS='http://www.w3.org/2000/svg';
 const el=(t,a)=>{const e=document.createElementNS(SVGNS,t);for(const k in a)e.setAttribute(k,a[k]);return e;};
-const APPS={}, NERVE={};
+const APPS={}, NERVE={}; let TARGETS={};
 let active=null;
 
 const toast=document.getElementById('toast'); let tT;
@@ -289,7 +300,10 @@ function buildCards(){
     const c=document.createElement('div'); c.className='card';
     c.innerHTML='<div class="flip">'+
       '<div class="face front"><div class="title"><span class="dot"></span>'+s.app+'</div>'+
-      '<div class="role">'+s.role+'</div><div class="acts"></div></div>'+
+      '<div class="role">'+s.role+'</div>'+
+      '<div class="figs"></div>'+
+      '<a class="live" target="_blank" rel="noopener">open the live app ↗</a>'+
+      '<div class="acts"></div></div>'+
       '<div class="face back"><div class="title">'+s.app+'</div>'+
       '<div class="bar"><i></i></div><div class="steps"></div></div></div>';
     g.appendChild(c);
@@ -303,8 +317,10 @@ function buildCards(){
       b.onclick=()=>trigger(s.app,a.path,b);
       acts.appendChild(b);
     }
+    const link=c.querySelector('.live');
+    if(TARGETS[s.app]) link.href=TARGETS[s.app]; else link.remove();
     APPS[s.app]={card:c, dot:c.querySelector('.dot'), bar:c.querySelector('.bar>i'),
-                 steps:c.querySelector('.steps')};
+                 steps:c.querySelector('.steps'), figs:c.querySelector('.figs')};
     c.addEventListener('mouseenter',()=>hot(s.app,true));
     c.addEventListener('mouseleave',()=>hot(s.app,false));
     poll(s.app);
@@ -401,9 +417,29 @@ fetch('crew').then(r=>r.json()).then(c=>{
 });
 
 fetch('targets').then(r=>r.json()).then(t=>{
+  TARGETS=t;
   buildNerve(SPEC.map(s=>s.app).filter(a=>t[a]||a==='sandbox'));
   buildCards();
+  pollMetrics();
 });
+
+async function pollMetrics(){
+  try{
+    const all=await (await fetch('metrics')).json();
+    for(const [app,snap] of Object.entries(all)){
+      const r=APPS[app]; if(!r||!snap.metrics) continue;
+      const html=snap.metrics.map(m=>
+        '<span title="'+(snap.note||'')+'"><b>'+m.value+'</b>'+
+        (m.unit?'<i>'+m.unit+'</i>':'')+'<em>'+m.label+'</em></span>').join('');
+      if(r.figs.dataset.sig!==html){
+        r.figs.dataset.sig=html; r.figs.innerHTML=html;
+        r.figs.classList.remove('moved'); void r.figs.offsetWidth;
+        r.figs.classList.add('moved');
+      }
+    }
+  }catch(e){}
+  setTimeout(pollMetrics, 5000);
+}
 </script></body></html>"""
 
 
@@ -483,12 +519,15 @@ async def drill() -> dict:
             "sandbox_broken_for_s": 120}
 
 
-async def _storm(url: str, n: int, seconds: int) -> None:
+async def _storm(url: str, n: int, seconds: int, app: str = "cargo") -> None:
     """Real traffic against a real service — the drills don't fake load."""
+    from helm import metrics as m
+
     async with httpx.AsyncClient(timeout=10) as c:
         for i in range(n):
             try:
                 await c.get(url)
+                m.note_request(app)
             except Exception:
                 pass
             await asyncio.sleep(seconds / n)
@@ -902,6 +941,13 @@ build();
 async def console() -> str:
     # one flagship page; /console kept as an alias
     return PAGE
+
+
+@app.get("/metrics")
+async def fleet_metrics() -> dict:
+    from helm import metrics as m
+
+    return await m.all_snapshots()
 
 
 @app.get("/art/{name}.jpg")
