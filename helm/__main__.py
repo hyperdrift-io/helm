@@ -34,7 +34,8 @@ async def main() -> None:
     server = uvicorn.Server(uvicorn.Config(
         app, host="0.0.0.0", port=int(os.environ.get("PORT", "8080")), log_level="warning"
     ))
-    await asyncio.gather(server.serve(), watch.run(events), orchestrate())
+    await asyncio.gather(server.serve(), watch.run(events), watch.signals(events),
+                         orchestrate())
 
 
 if __name__ == "__main__":

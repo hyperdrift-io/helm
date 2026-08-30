@@ -38,10 +38,10 @@ def _screen(text: str, source: str) -> str:
     return "[armor: quarantined instruction-shaped content from this response]"
 
 FLEET = {
-    "revela": {"url": "https://revela.club", "about": "photo-club product"},
-    "nextrole": {"url": "https://nextrole.site", "about": "CV / application helper"},
-    "intel": {"url": "https://intel.hyperdrift.io", "about": "market intel"},
-    "web3-capital": {"url": "https://web3.hyperdrift.io", "about": "DeFi analytics"},
+    "revela": {"url": "https://revela.club", "about": "photo-club product", "posthog": 169020},
+    "nextrole": {"url": "https://nextrole.site", "about": "CV / application helper", "posthog": 163996},
+    "intel": {"url": "https://intel.hyperdrift.io", "about": "market intel", "posthog": 170704},
+    "web3-capital": {"url": "https://web3.hyperdrift.io", "about": "DeFi analytics", "posthog": 170710},
     "sandbox": {"url": os.environ.get("HELM_SANDBOX_URL", "http://localhost:8080/sandbox"),
                 "about": "drill target — a real service the red button really breaks"},
 }
@@ -103,6 +103,42 @@ def file_github_issue(title: str, body: str, labels: list[str] | None = None) ->
     if r.status_code >= 300:
         return json.dumps({"filed": False, "status": r.status_code, "detail": r.text[:200]})
     return json.dumps({"filed": True, "url": r.json()["html_url"]})
+
+
+_PH_HOST = os.environ.get("POSTHOG_HOST", "https://eu.posthog.com")
+
+
+def posthog_window(project: int, hours: int, offset_hours: int = 0) -> dict | None:
+    """One analytics window for an app: events, pageviews, exceptions, visitors."""
+    key = os.environ.get("POSTHOG_API_KEY")
+    if not key:
+        return None
+    q = (f"SELECT count() AS events, countIf(event = '$pageview') AS pageviews, "
+         f"countIf(event = '$exception') AS exceptions, uniq(distinct_id) AS visitors "
+         f"FROM events WHERE timestamp > now() - INTERVAL {hours + offset_hours} HOUR "
+         f"AND timestamp <= now() - INTERVAL {offset_hours} HOUR")
+    r = httpx.post(f"{_PH_HOST}/api/projects/{project}/query/",
+                   headers={"Authorization": f"Bearer {key}"},
+                   json={"query": {"kind": "HogQLQuery", "query": q}}, timeout=30)
+    r.raise_for_status()
+    row = r.json()["results"][0]
+    return dict(zip(["events", "pageviews", "exceptions", "visitors"], row))
+
+
+@mcp.tool()
+def get_app_signals(app: str) -> str:
+    """Real product analytics for one app (PostHog): last 24h vs the 24h
+    before — traffic, exceptions, visitors. Use to judge whether an incident
+    touches users, and whether behaviour changed after an action."""
+    info = FLEET.get(app)
+    if not info or "posthog" not in info:
+        return json.dumps({"error": f"no analytics wired for '{app}'"})
+    try:
+        now = posthog_window(info["posthog"], 24)
+        prev = posthog_window(info["posthog"], 24, offset_hours=24)
+        return json.dumps({"app": app, "last_24h": now, "previous_24h": prev})
+    except Exception as e:
+        return json.dumps({"app": app, "error": f"{type(e).__name__}: {e}"})
 
 
 @mcp.tool()

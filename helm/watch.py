@@ -35,6 +35,32 @@ async def _probe(name: str, url: str) -> str:
         return "down"
 
 
+async def signals(queue: asyncio.Queue) -> None:
+    """Product-signal watch: an exception spike in any app wakes Helm."""
+    from helm.fleet_mcp import posthog_window
+
+    interval = int(os.environ.get("HELM_SIGNAL_INTERVAL", "1800"))
+    while True:
+        for name, app in FLEET.items():
+            if "posthog" not in app:
+                continue
+            try:
+                now = await asyncio.to_thread(posthog_window, app["posthog"], 1)
+                prev = await asyncio.to_thread(posthog_window, app["posthog"], 1, 1)
+            except Exception:
+                continue
+            if now and prev is not None and now["exceptions"] > max(2, 2 * prev["exceptions"]):
+                event: dict[str, Any] = {
+                    "kind": "exception_spike", "app": name, "source": "signal_watcher",
+                    "last_hour": now, "previous_hour": prev,
+                }
+                store.record("event", event=event,
+                             event_desc=f"signals: {name} exception spike "
+                                        f"({prev['exceptions']} → {now['exceptions']}/h)")
+                await queue.put(event)
+        await asyncio.sleep(interval)
+
+
 async def run(queue: asyncio.Queue) -> None:
     """Poll the fleet; enqueue an event on every state transition."""
     while True:
