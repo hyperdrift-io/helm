@@ -537,8 +537,31 @@ button[disabled] { background:var(--line); color:var(--dim); }
          opacity:0; transition:opacity .25s; }
 #toast.show { opacity:1; }
 a { color:var(--gold); }
+#nerve { width:100%; max-height:15rem; display:block; margin:.5rem 0 1rem; }
+#nerve .syn { stroke:var(--line); stroke-width:1.5; fill:none; }
+#nerve .syn.firing { stroke:var(--gold); stroke-width:2.5;
+  stroke-dasharray:6 8; animation:flow .7s linear infinite; }
+@keyframes flow { to { stroke-dashoffset:-28; } }
+#nerve .node { fill:var(--panel); stroke:var(--dim); stroke-width:1.5; transition:all .3s; }
+#nerve .node.up { stroke:var(--ok); }
+#nerve .node.down { stroke:var(--alert); fill:#1a0f0d; }
+#nerve .node.firing { stroke:var(--gold); }
+#nerve .hub { fill:var(--panel); stroke:var(--gold); stroke-width:2; }
+#nerve .hub-core { fill:var(--gold); animation:beat 2.4s ease-in-out infinite; transform-origin:center; }
+@keyframes beat { 0%,100%{opacity:.55;r:5} 50%{opacity:1;r:7} }
+#nerve text { fill:var(--dim); font:11px ui-monospace,Menlo,monospace; text-anchor:middle; }
+#nerve text.hub-label { fill:var(--gold); font-size:12px; letter-spacing:.12em; }
+@media (prefers-reduced-motion:reduce){ #nerve .syn.firing,#nerve .hub-core{animation:none} }
 </style></head><body>
-<h1>HELM · FLEET CONSOLE<small>flip a card: trigger, watch it stream to done</small></h1>
+<h1>HELM · FLEET CONSOLE<small>the orchestrator is the fleet's nervous system — a command travels the synapse to the app</small></h1>
+<svg id="nerve" viewBox="0 0 800 210" role="img"
+     aria-label="Helm orchestrator connected to each fleet app">
+  <g id="synapses"></g>
+  <g id="nodes"></g>
+  <circle class="hub" cx="400" cy="42" r="20"/>
+  <circle class="hub-core" cx="400" cy="42" r="5"/>
+  <text class="hub-label" x="400" y="16">HELM</text>
+</svg>
 <div class="grid" id="grid"></div>
 <p><a href="/">← incident bridge</a></p>
 <div id="toast"></div>
@@ -548,10 +571,24 @@ const toast = document.getElementById('toast'); let toastT;
 function popToast(t){ toast.textContent='Helm · '+t; toast.classList.add('show');
   clearTimeout(toastT); toastT=setTimeout(()=>toast.classList.remove('show'),2600); }
 
+const SVGNS='http://www.w3.org/2000/svg';
+function svg(tag, attrs){ const e=document.createElementNS(SVGNS,tag);
+  for(const k in attrs) e.setAttribute(k, attrs[k]); return e; }
 async function build(){
   const targets = await (await fetch('targets')).json();
-  const ops = ['cargo','nextrole','intel','web3-capital'];
+  const ops = ['cargo','nextrole','intel','web3-capital'].filter(a=>targets[a]);
   const grid = document.getElementById('grid');
+  const synG=document.getElementById('synapses'), nodeG=document.getElementById('nodes');
+  const HUBX=400, HUBY=42, NY=170, N=ops.length;
+  const nerve={};
+  ops.forEach((app,i)=>{
+    const x = Math.round(800*(i+1)/(N+1));
+    synG.appendChild(svg('line',{class:'syn', id:'syn-'+app, x1:HUBX, y1:HUBY, x2:x, y2:NY}));
+    nodeG.appendChild(svg('circle',{class:'node', id:'node-'+app, cx:x, cy:NY, r:14}));
+    const t=svg('text',{x:x, y:NY+30}); t.textContent=app; nodeG.appendChild(t);
+    nerve[app]={line:document.getElementById('syn-'+app), node:document.getElementById('node-'+app)};
+  });
+  window.__nerve=nerve;
   for(const app of ops){
     if(!targets[app]) continue;
     const card=document.createElement('div'); card.className='card';
@@ -581,13 +618,24 @@ async function build(){
 async function poll(app){
   const r=APPS[app]; if(!r) return;
   try{ const s=await (await fetch('probe?app='+app)).json();
-    r.dot.className='dot '+(s.http===200?'up':'down'); }catch(e){}
+    const st = s.http===200?'up':'down';
+    r.dot.className='dot '+st;
+    const nv=(window.__nerve||{})[app];
+    if(nv && !nv.node.classList.contains('firing'))
+      nv.node.className.baseVal='node '+st;
+  }catch(e){}
   setTimeout(()=>poll(app), 1500);
+}
+function fire(app, on){
+  const nv=(window.__nerve||{})[app]; if(!nv) return;
+  nv.line.classList.toggle('firing', on);
+  nv.node.classList.toggle('firing', on);
 }
 function trigger(app, mode){
   const r=APPS[app];
   r.card.classList.add('flipped');           // flips the instant the command fires
   r.steps.innerHTML=''; r.bar.style.width='0';
+  fire(app, true);                           // the synapse to this app lights up
   popToast((mode==='off'?'taking ':'restoring ')+app+'…');
   const es=new EventSource('control/'+app+'/stream');
   es.onopen=()=> fetch('control/'+app+'/'+mode,{method:'POST'});
@@ -597,7 +645,7 @@ function trigger(app, mode){
     r.bar.style.width=d.pct+'%';
     const line=document.createElement('div');
     line.innerHTML='<b>'+d.pct+'%</b> '+d.step; r.steps.prepend(line);
-    if(d.done){ es.close(); popToast(app+': '+d.step);
+    if(d.done){ es.close(); fire(app, false); popToast(app+': '+d.step);
       setTimeout(()=>r.card.classList.remove('flipped'), 1800); }
   };
 }
