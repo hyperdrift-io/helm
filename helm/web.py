@@ -192,6 +192,12 @@ async def probe(app: str) -> dict:
     info = FLEET.get(app)
     if not info:
         return {"app": app, "http": 0, "error": "unknown"}
+    # maintenance apps: the card reflects the orchestrator's mode (their hosts
+    # block datacenter egress, and on/off here IS the maintenance overlay).
+    if app in _MAINT_APPS:
+        mode = _app_mode.get(app, "online")
+        return {"app": app, "http": 200 if mode == "online" else 503,
+                "mode": mode, "url": info["url"]}
     t0 = time.monotonic()
     try:
         async with httpx.AsyncClient(follow_redirects=True, timeout=6) as c:
