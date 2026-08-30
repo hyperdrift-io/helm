@@ -1,96 +1,102 @@
-# Helm — Devpost submission draft
+# Helm — Devpost submission (paste-ready)
 
-**Event**: All Things Agentic Hackathon (Google). **Track**: The Fortified Enterprise Fleet.
-**Deadline**: 2026-08-31 17:00 PDT (Sep 1 01:00 BST).
+**Event**: All Things Agentic Hackathon (Google) · **Track**: The Fortified Enterprise Fleet
+**Deadline**: 2026-08-31 17:00 PDT = Sep 1 01:00 BST
 
-## Fields
+## Links
+- **Hosted project URL**: https://helm-294160018950.europe-west1.run.app
+  (console: `/console` · incident bridge: `/` · diagram: `/architecture.svg`)
+- **Repository**: https://github.com/hyperdrift-io/helm (public)
+- **Protected asset (billing service)**: https://cargo-294160018950.europe-west1.run.app
+- **Architecture diagram**: `assets/architecture.svg` (also served live)
 
-**Project name**: Helm
+## Google stack (required)
+- **Gemini 3.5 Flash** via Vertex AI — every decision in every cycle
+- **Agent Development Kit (ADK)** — the crew: `LlmAgent` + `sub_agents` routing +
+  `McpToolset` with per-agent `tool_filter`
+- **Google Cloud** — Cloud Run (two services), Cloud Run Admin API (the agent's
+  real infrastructure actions), Firestore (the ledger)
 
-**Tagline** (≤ Devpost limit): A fortified agent crew at the wheel of a live
-product fleet — it detects, defends, scales, and heals real services with no
-one at the keyboard.
+## Tagline
+A fortified agent crew at the wheel of a live product fleet — it detects,
+defends, scales and heals real services with no one at the keyboard.
 
-**Hosted URL**: https://helm-294160018950.europe-west1.run.app
-**Repository**: https://github.com/hyperdrift-io/helm (public at submission)
+## Description
 
-**Google stack used** (required checkboxes):
-- Gemini 3.5 Flash (Vertex AI) — every decision in every cycle
-- Agent Development Kit (ADK) — the crew (LlmAgent + sub_agents + McpToolset)
-- Google Cloud — Cloud Run (helm + cargo services), Firestore (ledger)
-
-## Writeup (problem-first; Voice Covenant; human tone)
-
-### The gap
-Agent demos watch a simulation. Real fleets don't get that luxury — when a
-service falls over at 2pm, or an attack starts, or traffic spikes, someone has
+**The gap.** Agent demos watch a simulation. Real fleets don't get that luxury:
+when a service falls over, or an attack starts, or traffic spikes, someone has
 to notice and act. For a small team that someone is always the same overloaded
 human. Helm is the crew that team doesn't have.
 
-### What it does
-Helm runs a real four-app production fleet (revela.club, nextrole.site,
-intel.hyperdrift.io, web3.hyperdrift.io). A crew of Gemini-powered ADK agents
-watches for change — an outage, an attack pattern, a traffic surge, an
-exception spike in the product analytics — and closes the loop itself:
-diagnose against live reality, take the one right action, verify it worked,
-file the post-mortem.
+**What it does.** Helm runs a real four-app production fleet. A crew of
+Gemini-powered ADK agents watches for change — an outage, an attack pattern, a
+traffic surge, an exception spike in the product analytics — and closes the
+loop itself: diagnose against live reality, take the one right action, verify
+it worked, file the post-mortem.
 
-### The crew, and why the split matters
-- **Commander** routes; it holds no tools.
-- **Watch Officer** is read-only: it verifies every event against live probes
-  and real PostHog telemetry, and it *cannot* act.
-- **Engineer** is act-scoped: it heals, takes services offline under attack,
-  scales them under load — all through the Cloud Run Admin API.
+**The crew, and why the split matters.** The Commander routes and holds no
+tools. The Watch Officer is read-only: it verifies every event against live
+probes and real PostHog telemetry, and it cannot act. The Engineer acts —
+healing services, cutting ingress under attack, scaling under load through the
+Cloud Run Admin API. That separation is enforced by construction: each agent's
+toolset is fixed by an MCP `tool_filter`, not by a prompt it might be talked
+out of. And the Engineer's power is hard-allowlisted to drill assets — ask it
+to take a production app offline and the tool itself refuses and escalates to
+a human.
 
-That separation is enforced by construction — each agent's toolset is fixed by
-an MCP `tool_filter`, not by a prompt it might be talked out of. And the
-Engineer's power is hard-allowlisted to drill assets: ask it to take a
-production app offline and the tool itself refuses and escalates to a human.
+**Real actions, not log lines.** Every control on the site causes a real
+effect a judge can reproduce. *Break* makes a service serve real 500s, with a
+prompt injection planted in the error page; the armor screen quarantines the
+injection before Gemini reads it, and the Engineer heals the service and
+verifies recovery. *Attack* storms the cargo billing service and the Engineer
+cuts its Cloud Run ingress — the public URL is dead in seconds. *Surge* floods
+it with real load and the Engineer raises the service's max instances, then
+proves it with a live config read rather than trusting the API's word.
 
-### Real actions, not log lines (the three drills)
-Every button on the bridge causes a real effect a judge can reproduce:
-- **Break** → the sandbox serves real 500s, with a prompt injection planted in
-  the error page. The armor screen quarantines the injection before Gemini
-  reads it; the Engineer heals the service and verifies recovery.
-- **Attack** → a real request storm hits the cargo service. The Engineer cuts
-  its Cloud Run ingress — the public URL is dead in seconds.
-- **Surge** → real load; the Engineer raises the service's max instances and
-  proves it with a live config read.
+**Why the injection beat matters.** An agent fleet reads its own telemetry, and
+telemetry carries text written by the outside world — so it is an attack
+surface. Helm treats anything instruction-shaped in a tool result as data to
+quarantine, never orders, and every quarantine is its own ledger record.
 
-### Why the injection beat matters
-An agent fleet reads its own telemetry, and telemetry carries user-generated
-text — so it's an attack surface. Helm treats anything instruction-shaped in a
-tool result as data to quarantine, never orders. Every quarantine is its own
-ledger record. (Production path: GEAP Model Armor.)
+**The console.** The orchestrator is the fleet's nervous system: a hub with a
+synapse to every app. Trigger a command and that synapse fires, the app's card
+flips, and progress streams step by step to completion — on the console *and*
+inside the app itself, which shows the same live toast and progress bar through
+a one-line control client. Streaming the steps is deliberate: the wait reads as
+live progress instead of a spinner.
 
-### Architecture
-Watchers and webhooks raise events → Commander routes → Watch Officer
-diagnoses → Engineer acts through the Fleet MCP → every event, tool call,
-quarantine and verdict lands on the Firestore ledger, streamed live to the
-bridge. Same code runs self-hosted (jsonl ledger) — the MCP tool surface is
-the contract; ADK and Gemini are its first automated client.
+**Architecture.** Watchers and webhooks raise events → the Commander routes →
+the Watch Officer diagnoses → the Engineer acts through the Fleet MCP → every
+event, tool call, quarantine and verdict lands on the Firestore ledger,
+streamed live to the bridge. The same code runs self-hosted with a jsonl
+ledger: the MCP tool surface is the contract, and ADK plus Gemini are its first
+automated client.
 
-### What's next
-The MCP surface is transport-neutral: the same tools already serve a human in
-a chat session. Helm is how we run our own fleet — and the start of a fleet
-operator any small team can point at their own.
+## Spin-up instructions
+```sh
+git clone https://github.com/hyperdrift-io/helm && cd helm
+uv sync
+gcloud auth application-default login          # Vertex AI credentials
+GOOGLE_CLOUD_PROJECT=<project> GITHUB_TOKEN=<token> uv run python -m helm
+# bridge on http://localhost:8080 — jsonl ledger, identical behaviour to prod
+```
+Deploy: `gcloud run deploy helm --source . --region europe-west1`
+(env: `HELM_SANDBOX_URL`, `HELM_CARGO_URL`, `HELM_FIRESTORE_DB`,
+`POSTHOG_API_KEY`, `GITHUB_TOKEN`; keep `--max-instances 1` — the watcher is
+one pair of eyes.) Full detail in the README.
 
-## Demo video plan (~3.5 min, problem-first, live product)
-1. 0:00 — cold open, bridge on one side, the **live cargo app open in its own
-   window** on the other. Press **Attack**. On camera the status strip flips
-   LIVE → DOWN and the app window goes dead the instant the Engineer cuts
-   ingress — real cause, real effect, no cut. "That was a real service, and
-   nobody was at the keyboard." (Recovery brings the window back to LIVE.)
-2. 0:45 — **Break**: the injection beat — show the armor line quarantining
-   "ignore previous instructions" from the error page; Engineer heals.
-3. 1:30 — **Surge**: real scale-up, show the Cloud Run console maxScale change.
-4. 2:15 — the crew manifest + ledger: identities, tool scopes, the allowlist
-   refusing a production app. The fortified story in ten seconds.
-5. 2:45 — 30s architecture close (must show the Cloud Run deployment).
-6. 3:15 — the real fleet: four live apps, real PostHog telemetry in a diagnosis.
+## Pre-existing code disclosure (per rules)
+All agent, orchestration, MCP, console and service code in this repository was
+written during the submission period. Pre-existing and disclosed: the four live
+Hyperdrift apps that Helm watches (they are the fleet, not part of the entry),
+their PostHog analytics projects, and the fleet-operations concepts this work
+reimagines. Standard open-source libraries used per their licences.
 
 ## Pre-send checklist
-- [ ] Repo public
-- [ ] GITHUB_TOKEN (fine-grained PAT) live on Cloud Run so post-mortems file in the video
-- [ ] cargo reset: ingress all, max-instances 3
-- [ ] Founder review gate approved (ledger)
+- [x] Repo public
+- [x] Architecture diagram (served + in repo)
+- [x] Hosted URL live, all drills verified in production
+- [ ] GITHUB_TOKEN with org resource owner → post-mortems file on camera
+- [ ] Demo video recorded (see RECORDING.md) and uploaded
+- [ ] `scripts/reset-demo.sh` run immediately before recording
+- [ ] Founder review gate approved
