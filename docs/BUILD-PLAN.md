@@ -23,5 +23,6 @@ concepts (Bridge/Commander) this reimagines. All agent code new in-window.
       per-card Recraft art, interactive /architecture page
 - [ ] ~3–4 min demo video: cold open on the red button, one full cycle,
       ledger + crew manifest, 30s architecture close (must show Cloud Run)
-- [ ] Devpost text: problem-first writeup, Voice Covenant pass, human tone
+- [x] Devpost text: problem-first writeup, Voice Covenant pass, human tone
+      (docs/SUBMISSION.md — links point at the live /architecture page)
 - [ ] Founder review gate (ledger: ready-for-review) before send-off

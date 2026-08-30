@@ -84,14 +84,26 @@ same max-instances number there.
 > "That's the real deployment. The agent changed it, and verified it with a
 > config read rather than trusting the API's word."
 
-### 3:05 — Close (T1)
-Scroll back to the molecule.
+### 3:05 — Architecture, then close (T1)
+Click **architecture · live ↗** in the header. Let the page light up for a beat —
+it is the same event stream, drawn as the pipeline rather than the fleet.
+
+> "Same run, seen end to end: watchers raise an event, the Commander routes it,
+> the Watch Officer diagnoses read-only, the Engineer acts through the MCP tool
+> surface, and every step lands on the ledger. This isn't a drawing of the
+> system — it's lit by the same events you just watched."
+
+Go back to the molecule.
 
 > "The map lights up the same way when nobody presses anything — the watchers
 > raise their own incidents. Gemini 3.5 decides, ADK routes the crew, an MCP
 > tool surface acts, Cloud Run and Firestore run and remember it. Same code
 > runs self-hosted — the tool surface is the contract. Helm is how we run our
 > own fleet."
+
+**Throughout**: the bar at the top of the page names every action as it lands —
+green when something recovered, red when something broke. You never need to
+explain what just happened; it says so.
 
 ---
 
