@@ -19,14 +19,28 @@ os.environ.setdefault("GOOGLE_CLOUD_LOCATION", "global")
 
 
 async def orchestrate() -> None:
-    """One event at a time: pull, run a Helm cycle, repeat."""
+    """One event at a time: pull, run a Helm cycle, repeat.
+
+    Vertex's shared pool can answer 429 under load; a transient rate limit
+    should not lose an incident, so the cycle is retried with backoff.
+    """
     while True:
         event = await events.get()
-        try:
-            await agent.handle_event(event)
-        except Exception as e:  # a failed cycle is itself ledger-worthy
-            store.record("cycle_error", error=f"{type(e).__name__}: {e}",
-                         event_kind=event.get("kind"))
+        for attempt in range(3):
+            try:
+                await agent.handle_event(event)
+                break
+            except Exception as e:
+                transient = "429" in str(e) or "RESOURCE_EXHAUSTED" in str(e)
+                if transient and attempt < 2:
+                    store.record("cycle_retry", attempt=attempt + 1,
+                                 reason="rate limited by the model API",
+                                 event_kind=event.get("kind"))
+                    await asyncio.sleep(4 * (attempt + 1))
+                    continue
+                store.record("cycle_error", error=f"{type(e).__name__}: {e}",
+                             event_kind=event.get("kind"))
+                break
 
 
 async def main() -> None:
