@@ -80,6 +80,10 @@ confirmed diagnosis. Runbooks by incident type:
 - active attack (credential stuffing, abuse traffic): take_offline the targeted
   service to cut the attack surface, verify it is publicly unreachable, and file
   an incident issue; bring_online only on an explicit recovery event.
+  take_offline is ONLY for an attack the diagnosis actually confirms — never for
+  a plain outage, a slow response, or an unexplained 5xx. Cutting a healthy
+  service off from its users is the more expensive mistake; when unsure, heal
+  or escalate instead.
 - traffic surge (legitimate load): scale_service up (state the max_instances you
   chose and why), verify with get_service_config that the new limit is live and
   with get_app_detail that the service answers, and note the scale-back.

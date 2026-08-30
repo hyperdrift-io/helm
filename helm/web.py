@@ -49,21 +49,32 @@ header a { color:var(--gold); margin-left:auto; font-size:.8rem; }
 h2 { font-size:.72rem; text-transform:uppercase; letter-spacing:.18em;
      color:var(--dim); font-weight:400; margin:2.4rem 0 .9rem; }
 
-/* ---- nervous system ---- */
-#nerve { width:100%; max-height:16rem; display:block; margin:1.4rem 0 .4rem; }
-#nerve .syn { stroke:var(--line); stroke-width:1.5; fill:none; transition:stroke .3s; }
-#nerve .syn.firing { stroke:var(--gold); stroke-width:2.5; stroke-dasharray:6 8;
-                     animation:flow .7s linear infinite; }
-@keyframes flow { to { stroke-dashoffset:-28; } }
-#nerve .node { fill:var(--panel); stroke:var(--dim); stroke-width:1.5; transition:all .3s; }
-#nerve .node.up { stroke:var(--ok); }
-#nerve .node.down { stroke:var(--alert); fill:#1d0f0c; }
-#nerve .node.firing { stroke:var(--gold); fill:#1d1608; }
+/* ---- the molecule ---- */
+#nerve { width:100%; display:block; margin:.6rem 0 .2rem; overflow:visible; cursor:default; }
+#nerve .bond { fill:none; stroke:#2b4150; stroke-width:1.5; transition:stroke .35s,stroke-width .35s; }
+#nerve .bond.hot { stroke:#4a6a7d; }
+#nerve .bond.firing { stroke:var(--gold); stroke-width:2.2; }
+#nerve .pulse { fill:var(--gold); }
+#nerve .node { cursor:pointer; }
+#nerve .nhalo { fill:none; stroke:transparent; stroke-width:1.2; transition:stroke .35s; }
+#nerve .ncore { fill:var(--panel); stroke:var(--dim); stroke-width:1.6;
+                transition:stroke .35s,fill .35s,r .35s; }
+#nerve .node text { fill:var(--dim); font:11px ui-monospace,Menlo,monospace;
+                    text-anchor:middle; transition:fill .35s; }
+#nerve .node.up .ncore { stroke:var(--ok); }
+#nerve .node.down .ncore { stroke:var(--alert); fill:#1d0f0c; }
+#nerve .node.down .nhalo { stroke:rgba(224,83,47,.35); }
+#nerve .node.firing .ncore { stroke:var(--gold); fill:#1d1608; r:16; }
+#nerve .node.firing .nhalo { stroke:rgba(216,160,61,.4); }
+#nerve .node.firing text, #nerve .node.hot text { fill:var(--ink); }
+#nerve .node.hot .ncore { r:16; }
+#nerve .node.hot .nhalo { stroke:rgba(216,160,61,.28); }
+#nerve .hubhalo { fill:none; stroke:rgba(216,160,61,.18); stroke-width:1.2; }
 #nerve .hub { fill:var(--panel); stroke:var(--gold); stroke-width:2; }
-#nerve .core { fill:var(--gold); animation:beat 2.6s ease-in-out infinite; }
-@keyframes beat { 0%,100%{opacity:.5;r:5} 50%{opacity:1;r:8} }
-#nerve text { fill:var(--dim); font:11px ui-monospace,Menlo,monospace; text-anchor:middle; }
-#nerve text.hl { fill:var(--gold); font-size:12px; letter-spacing:.14em; }
+#nerve .core { fill:var(--gold); }
+#nerve .electron { fill:var(--gold); opacity:.85; }
+#nerve .cap { fill:var(--gold); font:11px ui-monospace,Menlo,monospace; letter-spacing:.16em; }
+#nerve .cap tspan { fill:var(--dim); letter-spacing:.04em; }
 
 /* ---- cards ---- */
 #grid { display:grid; gap:1rem; grid-template-columns:repeat(auto-fill,minmax(16rem,1fr)); }
@@ -76,6 +87,8 @@ h2 { font-size:.72rem; text-transform:uppercase; letter-spacing:.18em;
         display:flex; flex-direction:column; }
 .face.back { transform:rotateY(180deg); }
 .card:hover .face { border-color:#2b3f4d; }
+.card.hot .face { border-color:var(--gold); box-shadow:0 0 0 1px rgba(216,160,61,.18); }
+.card.flipped .face.back { box-shadow:0 0 26px rgba(216,160,61,.10); }
 .title { display:flex; align-items:center; gap:.5rem; font-size:1.05rem; color:var(--gold); }
 .dot { width:.55rem; height:.55rem; border-radius:50%; background:var(--dim); flex:none; }
 .dot.up { background:var(--ok); box-shadow:0 0 10px var(--ok); }
@@ -128,12 +141,19 @@ footer { color:var(--dim); font-size:.78rem; margin-top:2.4rem; }
   <a href="architecture.svg">architecture ↗</a>
 </header>
 
-<svg id="nerve" viewBox="0 0 900 220" role="img"
-     aria-label="Helm orchestrator connected to each service">
-  <g id="synapses"></g><g id="nodes"></g>
-  <circle class="hub" cx="450" cy="44" r="21"/>
-  <circle class="core" cx="450" cy="44" r="5"/>
-  <text class="hl" x="450" y="18">HELM</text>
+<svg id="nerve" viewBox="0 0 900 370" role="img"
+     aria-label="Helm orchestrator bonded to each service in the fleet">
+  <g id="bonds"></g>
+  <g id="pulses"></g>
+  <g id="hub">
+    <circle class="hubhalo" cx="450" cy="185" r="44"/>
+    <circle class="hubhalo" cx="450" cy="185" r="62"/>
+    <circle class="hub" cx="450" cy="185" r="24"/>
+    <circle class="core" cx="450" cy="185" r="6"/>
+    <g id="electrons"></g>
+    <text class="cap" x="450" y="232" text-anchor="middle">HELM</text>
+  </g>
+  <g id="nodes"></g>
 </svg>
 
 <h2>The fleet — trigger a card, watch the crew work on its back</h2>
@@ -177,18 +197,88 @@ const SPEC=[
     {label:'Bring back', path:'control/web3-capital/on', safe:true}]},
 ];
 
+const HUB=[450,185], RX=320, RY=120;
+const REDUCED = matchMedia('(prefers-reduced-motion: reduce)').matches;
+let ELECTRONS=[], busy=false;
+
 function buildNerve(names){
-  const S=document.getElementById('synapses'), N=document.getElementById('nodes');
+  const B=document.getElementById('bonds'), N=document.getElementById('nodes'),
+        E=document.getElementById('electrons');
+  const n=names.length;
   names.forEach((app,i)=>{
-    const x=Math.round(900*(i+1)/(names.length+1)), y=176;
-    S.appendChild(el('line',{class:'syn',id:'s-'+app,x1:450,y1:44,x2:x,y2:y}));
-    N.appendChild(el('circle',{class:'node',id:'n-'+app,cx:x,cy:y,r:13}));
-    const t=el('text',{x:x,y:y+28}); t.textContent=app; N.appendChild(t);
-    NERVE[app]={line:S.lastChild, node:document.getElementById('n-'+app)};
+    const ang=-Math.PI/2 + i*2*Math.PI/n;
+    const base=[HUB[0]+Math.cos(ang)*RX, HUB[1]+Math.sin(ang)*RY];
+    const path=el('path',{class:'bond'}); B.appendChild(path);
+    const g=el('g',{class:'node'});
+    g.appendChild(el('circle',{class:'nhalo',r:22}));
+    g.appendChild(el('circle',{class:'ncore',r:13}));
+    const t=el('text',{y:36}); t.textContent=app; g.appendChild(t);
+    N.appendChild(g);
+    NERVE[app]={path,g,base,phase:Math.random()*6.283,state:'',firing:false,hot:false};
+    g.addEventListener('mouseenter',()=>hot(app,true));
+    g.addEventListener('mouseleave',()=>hot(app,false));
+    g.addEventListener('click',()=>{
+      const c=APPS[app]; if(!c) return;
+      c.card.scrollIntoView({behavior:REDUCED?'auto':'smooth',block:'center'});
+      hot(app,true); setTimeout(()=>hot(app,false),1400);
+    });
   });
+  for(let k=0;k<3;k++) E.appendChild(el('circle',{class:'electron',r:2.2}));
+  ELECTRONS=[...E.children];
+  requestAnimationFrame(tick);
 }
-function fire(app,on){ const n=NERVE[app]; if(!n) return;
-  n.line.classList.toggle('firing',on); n.node.classList.toggle('firing',on); }
+
+function paint(app){
+  const n=NERVE[app]; if(!n) return;
+  n.g.setAttribute('class','node '+(n.state||'')+(n.firing?' firing':'')+(n.hot?' hot':''));
+  n.path.setAttribute('class','bond'+(n.firing?' firing':'')+(n.hot?' hot':''));
+}
+function hot(app,on){
+  const n=NERVE[app]; if(!n) return;
+  n.hot=on; paint(app);
+  const c=APPS[app]; if(c) c.card.classList.toggle('hot',on);
+}
+function fire(app,on){
+  const n=NERVE[app]; if(!n) return;
+  n.firing=on; paint(app);
+  busy=Object.values(NERVE).some(x=>x.firing);
+}
+
+function tick(now){
+  const t=REDUCED?0:now/1000;
+  for(const app in NERVE){
+    const n=NERVE[app];
+    const dx=Math.sin(t*0.55+n.phase)*7, dy=Math.cos(t*0.42+n.phase*1.7)*5;
+    const x=n.base[0]+dx, y=n.base[1]+dy;
+    n.x=x; n.y=y;
+    n.g.setAttribute('transform','translate('+x+','+y+')');
+    const mx=(HUB[0]+x)/2, my=(HUB[1]+y)/2, ux=x-HUB[0], uy=y-HUB[1];
+    n.path.setAttribute('d','M'+HUB[0]+','+HUB[1]+' Q'+(mx-uy*0.11)+','+(my+ux*0.11)+' '+x+','+y);
+  }
+  const spin=busy?2.4:0.7, r=busy?17:13;
+  ELECTRONS.forEach((e,k)=>{
+    const a=t*spin + k*2.094;
+    e.setAttribute('cx', HUB[0]+Math.cos(a)*r);
+    e.setAttribute('cy', HUB[1]+Math.sin(a)*r*0.72);
+  });
+  const core=document.querySelector('#nerve .core');
+  if(core) core.setAttribute('r', busy ? 6+Math.sin(t*6)*1.8 : 5.5+Math.sin(t*1.6)*1.2);
+  requestAnimationFrame(tick);
+}
+
+function pulse(app){
+  const n=NERVE[app]; if(!n||REDUCED) return;
+  const P=document.getElementById('pulses');
+  const c=el('circle',{class:'pulse',r:3.6}); P.appendChild(c);
+  const start=performance.now(), dur=850;
+  (function step(now){
+    const k=Math.min(1,(now-start)/dur);
+    const L=n.path.getTotalLength(), p=n.path.getPointAtLength(L*k);
+    c.setAttribute('cx',p.x); c.setAttribute('cy',p.y);
+    c.setAttribute('r', 3.6-k*1.4); c.setAttribute('opacity', 1-k*0.55);
+    if(k<1) requestAnimationFrame(step); else c.remove();
+  })(start);
+}
 
 function buildCards(){
   const g=document.getElementById('grid');
@@ -209,6 +299,8 @@ function buildCards(){
     }
     APPS[s.app]={card:c, dot:c.querySelector('.dot'), bar:c.querySelector('.bar>i'),
                  steps:c.querySelector('.steps')};
+    c.addEventListener('mouseenter',()=>hot(s.app,true));
+    c.addEventListener('mouseleave',()=>hot(s.app,false));
     poll(s.app);
   }
 }
@@ -219,7 +311,7 @@ async function poll(app){
     const st=s.http===200?'up':'down';
     r.dot.className='dot '+st;
     const n=NERVE[app];
-    if(n && !n.node.classList.contains('firing')) n.node.setAttribute('class','node '+st);
+    if(n){ n.state=st; paint(app); }
   }catch(e){}
   setTimeout(()=>poll(app),1600);
 }
@@ -274,8 +366,9 @@ function render(r){
 
   if(!active || r.kind==='control') return;
   if(r.kind==='tool_call'){ seen++; progress(active,Math.min(90,10+seen*11));
+    pulse(active);
     line(active,'<b>'+(r.agent||'')+'</b> → '+r.tool); }
-  else if(r.kind==='armor'){ line(active,'armor quarantined an injection','arm'); }
+  else if(r.kind==='armor'){ pulse(active); line(active,'armor quarantined an injection','arm'); }
   else if(r.kind==='cycle_end'){
     const v=(r.verdict||'').match(/VERDICT:\s*(\w+)/);
     line(active,(r.verdict||'').split('VERDICT:').pop().trim().split('\n')[0]||'done','end');

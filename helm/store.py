@@ -56,14 +56,22 @@ def record(kind: str, **data: Any) -> dict[str, Any]:
 
 
 def recent(limit: int = 40) -> list[dict[str, Any]]:
-    if _recent or _db is None:
-        rows = _recent
-        if not rows and _LOCAL_PATH.exists():
-            lines = _LOCAL_PATH.read_text().splitlines()[-limit:]
-            rows = [json.loads(l) for l in lines]
-        return rows[-limit:]
-    docs = _db.collection("ledger").order_by("seq", direction="DESCENDING").limit(limit).get()
-    return [d.to_dict() for d in reversed(list(docs))]
+    """The audit trail, newest last. Firestore is authoritative when configured
+    so history survives a restart; memory/jsonl is the self-hosted path."""
+    if _db is not None:
+        try:
+            docs = (_db.collection("ledger")
+                    .order_by("seq", direction="DESCENDING").limit(limit).get())
+            rows = [d.to_dict() for d in reversed(list(docs))]
+            if rows:
+                return rows
+        except Exception:
+            pass
+        return _recent[-limit:]
+    rows = _recent
+    if not rows and _LOCAL_PATH.exists():
+        rows = [json.loads(l) for l in _LOCAL_PATH.read_text().splitlines()[-limit:]]
+    return rows[-limit:]
 
 
 def subscribe() -> asyncio.Queue:
