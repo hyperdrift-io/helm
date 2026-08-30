@@ -49,32 +49,53 @@ header a { color:var(--gold); margin-left:auto; font-size:.8rem; }
 h2 { font-size:.72rem; text-transform:uppercase; letter-spacing:.18em;
      color:var(--dim); font-weight:400; margin:2.4rem 0 .9rem; }
 
-/* ---- the molecule ---- */
-#nerve { width:100%; display:block; margin:.6rem 0 .2rem; overflow:visible; cursor:default; }
-#nerve .bond { fill:none; stroke:#2b4150; stroke-width:1.5; transition:stroke .35s,stroke-width .35s; }
-#nerve .bond.hot { stroke:#4a6a7d; }
-#nerve .bond.firing { stroke:var(--gold); stroke-width:2.2; }
-#nerve .pulse { fill:var(--gold); }
+/* ---- the molecule: every node is a window onto that app's own artwork ---- */
+#nerve { width:100%; display:block; margin:.2rem 0 .4rem; overflow:visible; cursor:default; }
+#nerve .aura, #nerve .speck, #nerve .scrim { pointer-events:none; }
+#nerve .speck { fill:var(--gold); }
+
+#nerve .bond { fill:none; stroke:#31495a; stroke-width:1.6; transition:stroke .4s; }
+#nerve .bond[data-hot] { stroke:#4d7085; }
+#nerve .haze { fill:none; stroke-width:9; stroke-linecap:round; opacity:0; transition:opacity .45s; }
+#nerve .blaze { fill:none; stroke-width:2.2; stroke-linecap:round; opacity:0; transition:opacity .35s; }
+#nerve .haze[data-lit] { opacity:.22; }
+#nerve .blaze[data-lit] { opacity:1; filter:url(#bglow); }
+#nerve .pulse circle { fill:#ffeac0; }
+
 #nerve .node { cursor:pointer; }
-#nerve .nhalo { fill:none; stroke:transparent; stroke-width:1.2; transition:stroke .35s; }
-#nerve .ncore { fill:var(--panel); stroke:var(--dim); stroke-width:1.6;
-                transition:stroke .35s,fill .35s,r .35s; }
-#nerve .node text { fill:var(--dim); font:11px ui-monospace,Menlo,monospace;
-                    text-anchor:middle; transition:fill .35s; }
-#nerve .node.up .ncore { stroke:var(--ok); }
-#nerve .node.down .ncore { stroke:var(--alert); fill:#1d0f0c; }
-#nerve .node.down .nhalo { stroke:rgba(224,83,47,.35); }
-#nerve .node.firing .ncore { stroke:var(--gold); fill:#1d1608; r:16; }
-#nerve .node.firing .nhalo { stroke:rgba(216,160,61,.4); }
-#nerve .node.firing text, #nerve .node.hot text { fill:var(--ink); }
-#nerve .node.hot .ncore { r:16; }
-#nerve .node.hot .nhalo { stroke:rgba(216,160,61,.28); }
-#nerve .hubhalo { fill:none; stroke:rgba(216,160,61,.18); stroke-width:1.2; }
-#nerve .hub { fill:var(--panel); stroke:var(--gold); stroke-width:2; }
-#nerve .core { fill:var(--gold); }
-#nerve .electron { fill:var(--gold); opacity:.85; }
-#nerve .cap { fill:var(--gold); font:11px ui-monospace,Menlo,monospace; letter-spacing:.16em; }
-#nerve .cap tspan { fill:var(--dim); letter-spacing:.04em; }
+#nerve .bloom { fill:transparent; opacity:0; transition:opacity .45s; }
+#nerve .nart { opacity:1; transition:opacity .4s; }
+#nerve .tint { fill:transparent; transition:fill .45s; }
+#nerve .nrim { fill:none; stroke:#3d5162; stroke-width:1.6;
+               transition:stroke .4s,stroke-width .4s; }
+#nerve .node text { fill:var(--dim); font:12px ui-monospace,Menlo,monospace;
+                    text-anchor:middle; letter-spacing:.06em; transition:fill .35s; }
+
+#nerve .node[data-state='up'] .nrim { stroke:var(--ok); }
+#nerve .node[data-state='up'] .bloom { fill:url(#halo-up); opacity:1; }
+#nerve .node[data-state='down'] .nrim { stroke:var(--alert); }
+#nerve .node[data-state='down'] .bloom { fill:url(#halo-down); opacity:1; }
+#nerve .node[data-state='down'] .tint { fill:rgba(224,83,47,.34); }
+#nerve .node[data-state='down'] .nart { opacity:.5; }
+#nerve .node[data-hot] .bloom { fill:url(#halo-gold); opacity:.75; }
+#nerve .node[data-hot] text { fill:var(--ink); }
+#nerve .node[data-lit] .nrim { stroke:var(--gold); stroke-width:2.6; filter:url(#glow); }
+#nerve .node[data-lit] .bloom { fill:url(#halo-gold); opacity:1; }
+#nerve .node[data-lit] .tint { fill:rgba(216,160,61,.2); }
+#nerve .node[data-lit] .nart { opacity:1; }
+#nerve .node[data-lit] text { fill:var(--gold); }
+
+#nerve .corerim { fill:none; stroke:var(--gold); stroke-width:1.8; opacity:.9; filter:url(#glow); }
+#nerve .ring { fill:none; stroke:var(--gold); }
+#nerve .electron { fill:#ffeac0; }
+#nerve .cap { fill:var(--gold); font:11px ui-monospace,Menlo,monospace; letter-spacing:.22em;
+              text-anchor:middle; }
+#nerve .cap tspan { fill:var(--dim); letter-spacing:.06em; }
+/* the map scales with the page — grow the type in viewBox units so it stays legible */
+@media (max-width:48rem) {
+  #nerve .node text { font-size:19px; }
+  #nerve .cap { font-size:16px; }
+}
 
 /* ---- cards ---- */
 #grid { display:grid; gap:1rem; grid-template-columns:repeat(auto-fill,minmax(16rem,1fr)); }
@@ -139,34 +160,101 @@ td.id { color:var(--dim); }
 #ledger li[data-kind="cycle_end"] { color:var(--ok); }
 #ledger li[data-kind="tool_call"] { color:var(--dim); }
 
-#toast { position:fixed; left:50%; bottom:26px; transform:translateX(-50%) translateY(8px);
-         background:var(--raise); border:1px solid var(--line); padding:.7rem 1.2rem;
-         opacity:0; transition:opacity .25s,transform .25s; pointer-events:none; }
-#toast.show { opacity:1; transform:translateX(-50%) translateY(0); }
+/* ---- the action bar: one line per triggered action, pinned clear of the cards ---- */
+#toast { position:fixed; top:0; left:50%; z-index:60; pointer-events:none;
+         width:min(42rem,calc(100vw - 1.6rem)); display:flex; align-items:center; gap:.7rem;
+         padding:.62rem .95rem; background:rgba(13,22,28,.96);
+         border:1px solid var(--line); border-left:3px solid var(--gold);
+         box-shadow:0 14px 34px rgba(0,0,0,.55);
+         transform:translate(-50%,-160%); opacity:0;
+         transition:transform .34s cubic-bezier(.2,.9,.25,1),opacity .3s,border-color .3s; }
+#toast[data-show] { transform:translate(-50%,1rem); opacity:1; }
+#toast i { flex:none; width:.42rem; height:.42rem; border-radius:50%; background:var(--gold);
+           box-shadow:0 0 9px var(--gold); animation:blip 1.1s ease-in-out infinite; }
+#toast b { flex:none; font-weight:400; font-size:.7rem; letter-spacing:.18em; color:var(--gold);
+           transition:color .3s; }
+#toast span { color:var(--ink); font-size:.82rem; overflow:hidden; white-space:nowrap;
+              text-overflow:ellipsis; }
+#toast[data-state='ok'] { border-left-color:var(--ok); }
+#toast[data-state='ok'] b { color:var(--ok); }
+#toast[data-state='ok'] i { background:var(--ok); box-shadow:0 0 9px var(--ok); animation:none; }
+#toast[data-state='bad'] { border-left-color:var(--alert); }
+#toast[data-state='bad'] b { color:var(--alert); }
+#toast[data-state='bad'] i { background:var(--alert); box-shadow:0 0 9px var(--alert); }
+@keyframes blip { 0%,100%{opacity:.3} 50%{opacity:1} }
+
 footer { color:var(--dim); font-size:.78rem; margin-top:2.4rem; }
-@media (prefers-reduced-motion:reduce){ .flip,#nerve .syn.firing,#nerve .core{animation:none;transition:none} }
+@media (prefers-reduced-motion:reduce){
+  .flip, .face.front, #toast, #nerve .bloom, #nerve .haze, #nerve .blaze
+    { animation:none; transition:none; }
+  #toast i { animation:none; opacity:1; }
+  .figs.moved b { animation:none; }
+}
 </style></head><body>
 
 <header>
   <h1>HELM</h1>
-  <p>An agent crew at the wheel of a live product fleet. The hub is the
-     orchestrator; every line is a nerve to a real service. Press anything
-     below — it happens for real.</p>
-  <a href="architecture.svg">architecture ↗</a>
+  <p>An agent crew at the wheel of a live product fleet. The burning centre is
+     the orchestrator; each node is the service itself, bonded to it. Press
+     anything below — it happens for real.</p>
+  <a href="architecture">architecture · live ↗</a>
 </header>
 
-<svg id="nerve" viewBox="0 0 900 370" role="img"
+<svg id="nerve" viewBox="0 0 900 400" role="img"
      aria-label="Helm orchestrator bonded to each service in the fleet">
+  <defs id="ndefs">
+    <filter id="glow" x="-60%" y="-60%" width="220%" height="220%">
+      <feGaussianBlur stdDeviation="3" result="b"/>
+      <feMerge><feMergeNode in="b"/><feMergeNode in="b"/><feMergeNode in="SourceGraphic"/></feMerge>
+    </filter>
+    <filter id="bglow" x="-15%" y="-15%" width="130%" height="130%">
+      <feGaussianBlur stdDeviation="2.4" result="b"/>
+      <feMerge><feMergeNode in="b"/><feMergeNode in="SourceGraphic"/></feMerge>
+    </filter>
+    <radialGradient id="aura">
+      <stop offset="0" stop-color="#d8a03d" stop-opacity=".2"/>
+      <stop offset=".4" stop-color="#d8a03d" stop-opacity=".06"/>
+      <stop offset="1" stop-color="#d8a03d" stop-opacity="0"/>
+    </radialGradient>
+    <radialGradient id="halo-up">
+      <stop offset=".6" stop-color="#7fd08f" stop-opacity="0"/>
+      <stop offset=".665" stop-color="#7fd08f" stop-opacity=".42"/>
+      <stop offset=".74" stop-color="#5fae6e" stop-opacity=".1"/>
+      <stop offset="1" stop-color="#5fae6e" stop-opacity="0"/>
+    </radialGradient>
+    <radialGradient id="halo-down">
+      <stop offset=".58" stop-color="#ff8a5c" stop-opacity="0"/>
+      <stop offset=".665" stop-color="#ff8a5c" stop-opacity=".9"/>
+      <stop offset=".76" stop-color="#e0532f" stop-opacity=".26"/>
+      <stop offset="1" stop-color="#e0532f" stop-opacity="0"/>
+    </radialGradient>
+    <radialGradient id="halo-gold">
+      <stop offset=".56" stop-color="#ffe0a8" stop-opacity="0"/>
+      <stop offset=".665" stop-color="#ffe0a8" stop-opacity=".95"/>
+      <stop offset=".78" stop-color="#d8a03d" stop-opacity=".3"/>
+      <stop offset="1" stop-color="#d8a03d" stop-opacity="0"/>
+    </radialGradient>
+    <radialGradient id="scrim">
+      <stop offset=".42" stop-color="#0a1015" stop-opacity="0"/>
+      <stop offset="1" stop-color="#0a1015" stop-opacity=".72"/>
+    </radialGradient>
+    <clipPath id="clip-core"><circle cx="450" cy="190" r="52"/></clipPath>
+  </defs>
+  <circle class="aura" cx="450" cy="190" r="240" fill="url(#aura)"/>
+  <g id="specks"></g>
   <g id="bonds"></g>
-  <g id="pulses"></g>
   <g id="hub">
-    <circle class="hubhalo" cx="450" cy="185" r="44"/>
-    <circle class="hubhalo" cx="450" cy="185" r="62"/>
-    <circle class="hub" cx="450" cy="185" r="24"/>
-    <circle class="core" cx="450" cy="185" r="6"/>
-    <g id="electrons"></g>
-    <text class="cap" x="450" y="232" text-anchor="middle">HELM</text>
+    <g id="rings"></g>
+    <g id="corebody">
+      <image class="coreart" href="art/core.jpg" x="398" y="138" width="104" height="104"
+             preserveAspectRatio="xMidYMid slice" clip-path="url(#clip-core)"/>
+      <circle class="scrim" cx="450" cy="190" r="52" fill="url(#scrim)"/>
+      <circle class="corerim" cx="450" cy="190" r="52"/>
+    </g>
+    <g id="electrons" filter="url(#glow)"></g>
+    <text class="cap" x="450" y="272">HELM <tspan>· orchestrator</tspan></text>
   </g>
+  <g id="pulses" filter="url(#glow)"></g>
   <g id="nodes"></g>
 </svg>
 
@@ -181,7 +269,7 @@ footer { color:var(--dim); font-size:.78rem; margin-top:2.4rem; }
 
 <footer>Gemini 3.5 decides · ADK routes the crew · an MCP tool surface acts ·
 Cloud Run and Firestore run and remember it. The same code runs self-hosted.</footer>
-<div id="toast"></div>
+<div id="toast" role="status" aria-live="polite"><i></i><b></b><span></span></div>
 
 <script>
 const SVGNS='http://www.w3.org/2000/svg';
@@ -189,9 +277,35 @@ const el=(t,a)=>{const e=document.createElementNS(SVGNS,t);for(const k in a)e.se
 const APPS={}, NERVE={}; let TARGETS={};
 let active=null;
 
-const toast=document.getElementById('toast'); let tT;
-function pop(t){ toast.textContent='Helm · '+t; toast.classList.add('show');
-  clearTimeout(tT); tT=setTimeout(()=>toast.classList.remove('show'),2800); }
+// ---- action bar: every triggered action surfaces here, queued not flickered ----
+const toast=document.getElementById('toast');
+const tName=toast.querySelector('b'), tMsg=toast.querySelector('span');
+const TQ=[]; let tBusy=false, tTimer=null;
+function verdictState(s){
+  s=(s||'').toLowerCase();
+  if(/fail|escalat|error|attack|breach|unreachable|stood down/.test(s)) return 'bad';
+  if(/heal|resolv|recover|restor|verified|confirmed|online|active|complete|done|ok/.test(s)) return 'ok';
+  return '';
+}
+function pop(app,msg,state){
+  const it={app:String(app||'helm').toUpperCase(), msg:String(msg||'').trim().slice(0,160),
+            state:state||''};
+  if(!it.msg) return;
+  const last=TQ[TQ.length-1];
+  if(last && last.app===it.app && last.state===it.state) TQ[TQ.length-1]=it;  // collapse churn
+  else TQ.push(it);
+  if(TQ.length>5) TQ.splice(0,TQ.length-5);
+  pump();
+}
+function pump(){
+  if(tBusy) return;
+  const it=TQ.shift();
+  if(!it){ toast.removeAttribute('data-show'); return; }
+  tName.textContent=it.app; tMsg.textContent=it.msg;
+  toast.dataset.state=it.state; toast.dataset.show='';
+  tBusy=true; clearTimeout(tTimer);
+  tTimer=setTimeout(()=>{ tBusy=false; pump(); }, TQ.length?900:3000);
+}
 
 const SPEC=[
   {app:'cargo', role:'billing service · the asset the crew defends', acts:[
@@ -211,24 +325,54 @@ const SPEC=[
     {label:'Bring back', path:'control/web3-capital/on', safe:true}]},
 ];
 
-const HUB=[450,185], RX=320, RY=120;
+const HUB=[450,190], RX=340, RY=128, R=30;
 const REDUCED = matchMedia('(prefers-reduced-motion: reduce)').matches;
-let ELECTRONS=[], busy=false;
+let ELECTRONS=[], RINGS=[], SPECKS=[], CORE=null, CORERIM=null, PULSES=null, busy=false;
 
 function buildNerve(names){
-  const B=document.getElementById('bonds'), N=document.getElementById('nodes'),
-        E=document.getElementById('electrons');
+  const D=document.getElementById('ndefs'), B=document.getElementById('bonds'),
+        N=document.getElementById('nodes'), E=document.getElementById('electrons'),
+        G=document.getElementById('rings'), S=document.getElementById('specks');
+  CORE=document.getElementById('corebody');
+  CORERIM=document.querySelector('#nerve .corerim');
+  PULSES=document.getElementById('pulses');
   const n=names.length;
   names.forEach((app,i)=>{
     const ang=-Math.PI/2 + i*2*Math.PI/n;
     const base=[HUB[0]+Math.cos(ang)*RX, HUB[1]+Math.sin(ang)*RY];
-    const path=el('path',{class:'bond'}); B.appendChild(path);
+
+    // energy gradient: dark at the hub, blazing at the service
+    const grad=el('linearGradient',{id:'flow-'+app,gradientUnits:'userSpaceOnUse'});
+    grad.appendChild(el('stop',{offset:'0','stop-color':'#d8a03d','stop-opacity':'.08'}));
+    const mid=el('stop',{offset:'.5','stop-color':'#ffdc9a','stop-opacity':'1'});
+    grad.appendChild(mid);
+    grad.appendChild(el('stop',{offset:'1','stop-color':'#d8a03d','stop-opacity':'.9'}));
+    D.appendChild(grad);
+    const clip=el('clipPath',{id:'clip-'+app});
+    clip.appendChild(el('circle',{r:R})); D.appendChild(clip);
+
+    const bond=el('path',{class:'bond'}),
+          haze=el('path',{class:'haze',stroke:'url(#flow-'+app+')'}),
+          blaze=el('path',{class:'blaze',stroke:'url(#flow-'+app+')'});
+    B.appendChild(bond); B.appendChild(haze); B.appendChild(blaze);
+
+    // the node IS the app's artwork — same art as its card, seen through a porthole
     const g=el('g',{class:'node'});
-    g.appendChild(el('circle',{class:'nhalo',r:22}));
-    g.appendChild(el('circle',{class:'ncore',r:13}));
-    const t=el('text',{y:36}); t.textContent=app; g.appendChild(t);
+    g.appendChild(el('circle',{class:'bloom',r:R*1.5}));
+    const img=el('image',{class:'nart',x:-R,y:-R,width:R*2,height:R*2,
+      preserveAspectRatio:'xMidYMid slice','clip-path':'url(#clip-'+app+')'});
+    img.setAttribute('href','art/'+app+'.jpg');
+    img.setAttributeNS('http://www.w3.org/1999/xlink','xlink:href','art/'+app+'.jpg');
+    g.appendChild(img);
+    g.appendChild(el('circle',{class:'scrim',r:R,fill:'url(#scrim)'}));
+    g.appendChild(el('circle',{class:'tint',r:R}));
+    g.appendChild(el('circle',{class:'nrim',r:R}));
+    const t=el('text',{y:R+22}); t.textContent=app; g.appendChild(t);
     N.appendChild(g);
-    NERVE[app]={path,g,base,phase:Math.random()*6.283,state:'',firing:false,hot:false};
+
+    NERVE[app]={bond,haze,blaze,grad,mid,g,base,
+      phase:Math.random()*6.283, depth:0.9+0.22*((base[1]-(HUB[1]-RY))/(RY*2)),
+      scale:1, state:'', firing:false, hot:false};
     g.addEventListener('mouseenter',()=>hot(app,true));
     g.addEventListener('mouseleave',()=>hot(app,false));
     g.addEventListener('click',()=>{
@@ -237,15 +381,31 @@ function buildNerve(names){
       hot(app,true); setTimeout(()=>hot(app,false),1400);
     });
   });
-  for(let k=0;k<3;k++) E.appendChild(el('circle',{class:'electron',r:2.2}));
+  for(let k=0;k<3;k++) E.appendChild(el('circle',{class:'electron',r:2.6}));
   ELECTRONS=[...E.children];
-  requestAnimationFrame(tick);
+  for(let k=0;k<3;k++){ const c=el('circle',{class:'ring',cx:HUB[0],cy:HUB[1],r:52});
+    G.appendChild(c); RINGS.push(c); }
+  for(let k=0;k<38;k++){
+    const d=0.25+Math.random()*0.75;
+    const c=el('circle',{class:'speck',r:(0.6+d*1.4).toFixed(2)});
+    S.appendChild(c);
+    SPECKS.push({e:c,x:Math.random()*900,y:Math.random()*400,d,
+                 ph:Math.random()*6.283,sp:0.15+d*0.55});
+  }
+  frame(0);
+  if(!REDUCED) requestAnimationFrame(tick);
 }
 
 function paint(app){
   const n=NERVE[app]; if(!n) return;
-  n.g.setAttribute('class','node '+(n.state||'')+(n.firing?' firing':'')+(n.hot?' hot':''));
-  n.path.setAttribute('class','bond'+(n.firing?' firing':'')+(n.hot?' hot':''));
+  const d=n.g.dataset;
+  if(n.state) d.state=n.state; else delete d.state;
+  if(n.firing) d.lit=''; else delete d.lit;
+  if(n.hot) d.hot=''; else delete d.hot;
+  if(n.hot) n.bond.dataset.hot=''; else delete n.bond.dataset.hot;
+  if(n.firing){ n.haze.dataset.lit=''; n.blaze.dataset.lit=''; }
+  else { delete n.haze.dataset.lit; delete n.blaze.dataset.lit; }
+  if(REDUCED) frame(0);
 }
 function hot(app,on){
   const n=NERVE[app]; if(!n) return;
@@ -258,39 +418,73 @@ function fire(app,on){
   busy=Object.values(NERVE).some(x=>x.firing);
 }
 
-function tick(now){
-  const t=REDUCED?0:now/1000;
+function frame(t){
   for(const app in NERVE){
     const n=NERVE[app];
-    const dx=Math.sin(t*0.55+n.phase)*7, dy=Math.cos(t*0.42+n.phase*1.7)*5;
-    const x=n.base[0]+dx, y=n.base[1]+dy;
+    const x=n.base[0]+(REDUCED?0:Math.sin(t*0.55+n.phase)*8),
+          y=n.base[1]+(REDUCED?0:Math.cos(t*0.42+n.phase*1.7)*6);
     n.x=x; n.y=y;
-    n.g.setAttribute('transform','translate('+x+','+y+')');
+    const want=n.depth*(n.firing?1.17:(n.hot?1.09:1));
+    n.scale=REDUCED?want:n.scale+(want-n.scale)*0.09;
+    n.g.setAttribute('transform','translate('+x.toFixed(2)+','+y.toFixed(2)+
+                     ') scale('+n.scale.toFixed(3)+')');
     const mx=(HUB[0]+x)/2, my=(HUB[1]+y)/2, ux=x-HUB[0], uy=y-HUB[1];
-    n.path.setAttribute('d','M'+HUB[0]+','+HUB[1]+' Q'+(mx-uy*0.11)+','+(my+ux*0.11)+' '+x+','+y);
+    const d='M'+HUB[0]+','+HUB[1]+' Q'+(mx-uy*0.11).toFixed(1)+','+(my+ux*0.11).toFixed(1)+
+            ' '+x.toFixed(1)+','+y.toFixed(1);
+    n.bond.setAttribute('d',d); n.haze.setAttribute('d',d); n.blaze.setAttribute('d',d);
+    n.grad.setAttribute('x1',HUB[0]); n.grad.setAttribute('y1',HUB[1]);
+    n.grad.setAttribute('x2',x.toFixed(1)); n.grad.setAttribute('y2',y.toFixed(1));
+    if(n.firing && !REDUCED)
+      n.mid.setAttribute('offset',(0.1+((t*0.55)%1)*0.85).toFixed(3));
   }
-  const spin=busy?2.4:0.7, r=busy?17:13;
+  const spin=busy?2.6:0.75, orb=busy?74:66;
   ELECTRONS.forEach((e,k)=>{
     const a=t*spin + k*2.094;
-    e.setAttribute('cx', HUB[0]+Math.cos(a)*r);
-    e.setAttribute('cy', HUB[1]+Math.sin(a)*r*0.72);
+    e.setAttribute('cx',(HUB[0]+Math.cos(a)*orb).toFixed(1));
+    e.setAttribute('cy',(HUB[1]+Math.sin(a)*orb*0.44).toFixed(1));
   });
-  const core=document.querySelector('#nerve .core');
-  if(core) core.setAttribute('r', busy ? 6+Math.sin(t*6)*1.8 : 5.5+Math.sin(t*1.6)*1.2);
-  requestAnimationFrame(tick);
+  const period=busy?1.5:3.6;
+  RINGS.forEach((c,k)=>{
+    const f=REDUCED?0:((t/period)+k/RINGS.length)%1;
+    c.setAttribute('r',(52+f*128).toFixed(1));
+    c.setAttribute('opacity',((1-f)*(1-f)*(busy?0.45:0.2)).toFixed(3));
+    c.setAttribute('stroke-width',(1.6*(1-f)+0.4).toFixed(2));
+  });
+  SPECKS.forEach(s=>{
+    const x=s.x+(REDUCED?0:Math.sin(t*0.11*s.sp+s.ph)*24*s.d),
+          y=s.y+(REDUCED?0:Math.cos(t*0.083*s.sp+s.ph*1.4)*16*s.d);
+    s.e.setAttribute('transform','translate('+x.toFixed(1)+','+y.toFixed(1)+')');
+    s.e.setAttribute('opacity',((0.05+0.15*s.d)*
+      (REDUCED?1:0.55+0.45*Math.sin(t*0.9+s.ph*3))).toFixed(3));
+  });
+  if(CORE){
+    const s=REDUCED?1:(busy?1+Math.sin(t*3)*0.035:1+Math.sin(t*1.2)*0.014);
+    CORE.setAttribute('transform','translate('+(HUB[0]*(1-s)).toFixed(2)+','+
+      (HUB[1]*(1-s)).toFixed(2)+') scale('+s.toFixed(4)+')');
+  }
+  if(CORERIM) CORERIM.setAttribute('stroke-width',
+    REDUCED?1.8:(busy?2.4+Math.sin(t*6)*0.9:1.8+Math.sin(t*1.6)*0.4).toFixed(2));
 }
+function tick(now){ frame(now/1000); requestAnimationFrame(tick); }
 
+// a light with a trail, riding the bond out to the service on every tool call
+const TRAIL=[[0,4.4,1],[0.035,3.4,0.7],[0.07,2.6,0.46],[0.105,1.9,0.28],[0.14,1.3,0.15]];
 function pulse(app){
   const n=NERVE[app]; if(!n||REDUCED) return;
-  const P=document.getElementById('pulses');
-  const c=el('circle',{class:'pulse',r:3.6}); P.appendChild(c);
-  const start=performance.now(), dur=850;
+  if(PULSES.children.length>18) return;
+  const g=el('g',{class:'pulse'});
+  const cs=TRAIL.map(p=>{ const c=el('circle',{r:p[1],opacity:p[2]}); g.appendChild(c); return c; });
+  PULSES.appendChild(g);
+  const path=n.blaze, start=performance.now(), dur=900;
   (function step(now){
-    const k=Math.min(1,(now-start)/dur);
-    const L=n.path.getTotalLength(), p=n.path.getPointAtLength(L*k);
-    c.setAttribute('cx',p.x); c.setAttribute('cy',p.y);
-    c.setAttribute('r', 3.6-k*1.4); c.setAttribute('opacity', 1-k*0.55);
-    if(k<1) requestAnimationFrame(step); else c.remove();
+    const k=Math.min(1,(now-start)/dur), L=path.getTotalLength();
+    const fade=k<0.85?1:(1-k)/0.15;
+    TRAIL.forEach((p,i)=>{
+      const q=path.getPointAtLength(L*Math.max(0,k-p[0]));
+      cs[i].setAttribute('cx',q.x.toFixed(1)); cs[i].setAttribute('cy',q.y.toFixed(1));
+      cs[i].setAttribute('opacity',(p[2]*fade).toFixed(3));
+    });
+    if(k<1) requestAnimationFrame(step); else g.remove();
   })(start);
 }
 
@@ -350,7 +544,7 @@ async function trigger(app,path,btn){
   active=app; r.card.classList.add('flipped'); r.steps.innerHTML=''; progress(app,4);
   fire(app,true);
   btn.disabled=true; setTimeout(()=>{btn.disabled=false;},20000);
-  pop(app+': command sent');
+  pop(app, btn.textContent.trim().toLowerCase()+' — command sent to the orchestrator');
   if(path.startsWith('control/')){
     const es=new EventSource('control/'+app+'/stream');
     es.onmessage=e=>{ const d=JSON.parse(e.data);
@@ -366,7 +560,7 @@ async function trigger(app,path,btn){
   }
 }
 function finish(app,msg){
-  fire(app,false); progress(app,100); pop(app+': '+msg);
+  fire(app,false); progress(app,100); pop(app,msg,verdictState(msg));
   setTimeout(()=>{ const r=APPS[app]; if(r) r.card.classList.remove('flipped');
     if(active===app) active=null; },2600);
 }
@@ -381,6 +575,24 @@ function activate(app){
   c.card.classList.add('flipped'); c.steps.innerHTML=''; progress(app,8);
   fire(app,true);
 }
+// every live record raises the bar — a button press, a control step, or a
+// cycle a watcher opened with nobody at the keyboard
+function toastFor(r){
+  const ev=r.event||{};
+  if(r.kind==='control') return pop(r.app, r.step+' · '+r.pct+'%',
+                                    r.pct>=100?verdictState(r.step):'');
+  if(r.kind==='event') return pop(ev.app, r.event_desc||'incident raised','bad');
+  if(r.kind==='cycle_start') return pop(ev.app,'cycle opened — the crew is on it');
+  if(r.kind==='tool_call') return pop((r.args||{}).app||active,
+                                      (r.agent||'crew')+' → '+r.tool);
+  if(r.kind==='armor') return pop(active,'armor quarantined a prompt injection','bad');
+  if(r.kind==='cycle_retry') return pop(active,'retry — '+(r.reason||'transient failure'),'bad');
+  if(r.kind==='cycle_error') return pop(active,'cycle error — '+(r.error||''),'bad');
+  if(r.kind==='cycle_end' && !active){   // otherwise finish() carries the verdict
+    const v=(r.verdict||'').match(/VERDICT:\s*(\w+)/);
+    pop('fleet', v?('verdict: '+v[1]):'cycle closed', verdictState(v?v[1]:''));
+  }
+}
 function render(r,live){
   const li=document.createElement('li'); li.dataset.kind=r.kind;
   let txt=r.kind;
@@ -394,6 +606,7 @@ function render(r,live){
   led.prepend(li); while(led.children.length>120) led.lastChild.remove();
 
   if(!live) return;                      // replayed history must not re-animate
+  toastFor(r);
   if(r.kind==='cycle_start') activate((r.event||{}).app);
   if(!active || r.kind==='control') return;
   if(r.kind==='tool_call'){ seen++; progress(active,Math.min(90,10+seen*11));
@@ -961,6 +1174,14 @@ async def art(name: str):
         return FileResponse(p, media_type="image/jpeg",
                             headers={"Cache-Control": "public, max-age=3600"})
     return Response("not found", status_code=404)
+
+
+@app.get("/architecture", response_class=HTMLResponse)
+async def architecture_live() -> str:
+    """The architecture diagram, lit by the real event stream."""
+    from helm.arch import ARCH_PAGE
+
+    return ARCH_PAGE
 
 
 @app.get("/architecture.svg")

@@ -31,8 +31,8 @@ h2 { font-size:.72rem; text-transform:uppercase; letter-spacing:.18em;
 h2 span { color:var(--gold); }
 
 /* ---- the pipeline ---- */
-#map { position:relative; display:grid; gap:1.1rem 2.4rem; margin-top:1.4rem;
-       grid-template-columns:1.25fr .95fr 1fr .78fr .95fr .95fr;
+#map { position:relative; display:grid; gap:1.1rem 2.2rem; margin-top:1.4rem;
+       align-items:center; grid-template-columns:1.1fr .95fr 1.05fr .95fr 1fr 1fr;
        grid-template-areas:
          "src cmd watch armor mcp run"
          "src cmd eng   armor mcp gh"
@@ -150,16 +150,15 @@ footer { color:var(--dim); font-size:.76rem; margin-top:2.4rem; }
 
   <section id="n-armor" data-role="gate">
     <h3>armor screen</h3>
-    <p>A gate on tool results coming back in. Instruction-shaped text found in a
-       probe result is quarantined before the model reads it — and the
-       quarantine is itself a record.</p>
+    <p>The gate on results coming back in: instruction-shaped text in a probe
+       result is quarantined before the model reads it.</p>
   </section>
 
   <section id="n-mcp" data-role="surface">
     <h3>Fleet MCP</h3>
-    <p>The tool surface, a standalone MCP server. A per-agent
-       <code>tool_filter</code> is what enforces the two identities — by
-       construction, not by prompt.</p>
+    <p>The tool surface — a standalone MCP server. A per-agent
+       <code>tool_filter</code> enforces the two identities by construction,
+       not by prompt.</p>
   </section>
 
   <section id="n-run" data-role="effect">
@@ -218,7 +217,8 @@ function box(id){
   return {l:r.left-m.left, t:r.top-m.top, r:r.right-m.left, b:r.bottom-m.top,
           cx:r.left-m.left+r.width/2, cy:r.top-m.top+r.height/2};
 }
-function shape(a, b){
+function shape(a, b, bus){
+  if(bus && b.t > a.b+4) return 'M'+a.cx+','+a.b+'L'+a.cx+','+b.t;
   if(b.l > a.r+4){
     const k = Math.max(16,(b.l-a.r)*0.45);
     return 'M'+a.r+','+a.cy+'C'+(a.r+k)+','+a.cy+' '+(b.l-k)+','+b.cy+' '+b.l+','+b.cy;
@@ -236,7 +236,7 @@ function layout(){
   wires.setAttribute('viewBox','0 0 '+Math.round(m.width)+' '+Math.round(m.height));
   for(const k in EDGES){
     const e = EDGES[k], a = box(e.a), b = box(e.b);
-    if(a && b) e.p.setAttribute('d', shape(a,b));
+    if(a && b) e.p.setAttribute('d', shape(a, b, e.p.dataset.bus));
   }
 }
 function relayout(){ if(!pending){ pending = true; requestAnimationFrame(layout); } }

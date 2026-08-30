@@ -15,10 +15,12 @@ concepts (Bridge/Commander) this reimagines. All agent code new in-window.
 - [x] Cloud Run deploy, max-instances 1; production drill verified end to end
 
 ## Remaining
-- [ ] FOUNDER: Devpost account + Register on the event (blocking submission)
-- [ ] FOUNDER: fine-grained PAT (repo: hyperdrift-io/helm, Issues: read+write only)
-      → set on Cloud Run as GITHUB_TOKEN; local runs use gh auth token
-- [ ] Repo public at submission time
+- [x] FOUNDER: Devpost account + registered (2026-08-30)
+- [x] FOUNDER: fine-grained PAT (org resource owner, Issues RW) → live on Cloud Run;
+      verified: the Engineer filed issues #3 and #4 from production
+- [x] Repo public (github.com/hyperdrift-io/helm)
+- [x] Live metrics per card (PostHog + Cloud Run capacity), molecular map,
+      per-card Recraft art, interactive /architecture page
 - [ ] ~3–4 min demo video: cold open on the red button, one full cycle,
       ledger + crew manifest, 30s architecture close (must show Cloud Run)
 - [ ] Devpost text: problem-first writeup, Voice Covenant pass, human tone
