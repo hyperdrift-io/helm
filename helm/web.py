@@ -10,8 +10,10 @@ from __future__ import annotations
 
 import asyncio
 import json
+import os
 import time
 
+import httpx
 from fastapi import FastAPI, Request
 from fastapi.responses import HTMLResponse, StreamingResponse
 
@@ -64,11 +66,14 @@ footer { margin-top:2rem; color:var(--dim); font-size:.8rem; }
 <section>
 <h2>Incident drill</h2>
 <button id="drill">Break a real service</button>
-<p>This genuinely breaks the sandbox service — it serves 500s, with a prompt
-injection planted in the error page. Watch the crew below: the Watch Officer
-verifies against live probes (armor quarantines the injection), the Engineer
-heals the service, verifies the fix, and files the post-mortem. One drill
-per minute.</p>
+<button id="attack">Attack a real service</button>
+<button id="surge">Surge real traffic</button>
+<p>Each drill is real: <b>break</b> makes the sandbox serve 500s (with a
+prompt injection planted in the error page — armor quarantines it) and the
+Engineer heals it; <b>attack</b> storms the cargo service and the Engineer
+takes it offline for real (Cloud Run ingress cut); <b>surge</b> floods it
+with legitimate load and the Engineer scales the real service up. Diagnose →
+act → verify → post-mortem, every time. One drill per minute.</p>
 </section>
 <section>
 <h2>Crew manifest — who exists, what identity, which tools</h2>
@@ -109,11 +114,12 @@ fetch('crew').then(r=>r.json()).then(c => {
   }
 });
 new EventSource('stream').onmessage = e => row(JSON.parse(e.data));
-document.getElementById('drill').onclick = async ev => {
-  ev.target.disabled = true;
-  await fetch('drill', {method:'POST'});
-  setTimeout(()=>{ ev.target.disabled = false; }, 60000);
-};
+for (const [id, path] of [['drill','drill'],['attack','drill/attack'],['surge','drill/surge']])
+  document.getElementById(id).onclick = async ev => {
+    ev.target.disabled = true;
+    await fetch(path, {method:'POST'});
+    setTimeout(()=>{ ev.target.disabled = false; }, 60000);
+  };
 </script></body></html>"""
 
 
@@ -155,6 +161,60 @@ async def drill() -> dict:
     store.record("event", event=event, event_desc="red button: sandbox service now failing for 2 min")
     await events.put(event)
     return {"queued": True, "sandbox_broken_for_s": 120}
+
+
+async def _storm(url: str, n: int, seconds: int) -> None:
+    """Real traffic against a real service — the drills don't fake load."""
+    async with httpx.AsyncClient(timeout=10) as c:
+        for i in range(n):
+            try:
+                await c.get(url)
+            except Exception:
+                pass
+            await asyncio.sleep(seconds / n)
+
+
+@app.post("/drill/attack")
+async def drill_attack() -> dict:
+    """Attack drill: a genuine request storm hits cargo while the event
+    carries the attack signature. The Engineer's defence is real: Cloud Run
+    ingress goes internal-only and the public URL stops answering."""
+    global _last_drill
+    now = time.monotonic()
+    if _last_drill is not None and now - _last_drill < 60:
+        return {"queued": False, "reason": "one drill per minute"}
+    _last_drill = now
+    cargo = os.environ.get("HELM_CARGO_URL", "http://localhost:8081")
+    asyncio.get_running_loop().create_task(_storm(f"{cargo}/work", 120, 45))
+    event = {"kind": "attack_detected", "app": "cargo",
+             "evidence": {"pattern": "credential-stuffing shape: 40 req/s on one route "
+                                     "from a single source", "drill": True},
+             "source": "bridge_red_button"}
+    store.record("event", event=event,
+                 event_desc="red button: attack traffic now hitting cargo")
+    await events.put(event)
+    return {"queued": True}
+
+
+@app.post("/drill/surge")
+async def drill_surge() -> dict:
+    """Surge drill: legitimate load spike on cargo — the Engineer scales the
+    real Cloud Run service up and verifies it holds."""
+    global _last_drill
+    now = time.monotonic()
+    if _last_drill is not None and now - _last_drill < 60:
+        return {"queued": False, "reason": "one drill per minute"}
+    _last_drill = now
+    cargo = os.environ.get("HELM_CARGO_URL", "http://localhost:8081")
+    asyncio.get_running_loop().create_task(_storm(f"{cargo}/work", 150, 60))
+    event = {"kind": "traffic_surge", "app": "cargo",
+             "evidence": {"pattern": "legitimate load: sustained spike on /work, "
+                                     "latency climbing", "drill": True},
+             "source": "bridge_red_button"}
+    store.record("event", event=event,
+                 event_desc="red button: traffic surge now hitting cargo")
+    await events.put(event)
+    return {"queued": True}
 
 
 @app.get("/sandbox")

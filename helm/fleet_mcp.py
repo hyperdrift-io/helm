@@ -44,6 +44,8 @@ FLEET = {
     "web3-capital": {"url": "https://web3.hyperdrift.io", "about": "DeFi analytics", "posthog": 170710},
     "sandbox": {"url": os.environ.get("HELM_SANDBOX_URL", "http://localhost:8080/sandbox"),
                 "about": "drill target — a real service the red button really breaks"},
+    "cargo": {"url": os.environ.get("HELM_CARGO_URL", "http://localhost:8081"),
+              "about": "drill asset — a real Cloud Run service the crew defends and scales"},
 }
 
 ISSUE_REPO = os.environ.get("HELM_ISSUE_REPO", "hyperdrift-io/helm")
@@ -154,6 +156,65 @@ def heal_service(app: str) -> str:
         return r.text
     except Exception as e:
         return json.dumps({"healed": False, "reason": f"{type(e).__name__}: {e}"})
+
+
+# Hard allowlist: real infrastructure power, scoped by construction. The
+# Engineer can defend the drill asset; the production fleet and the bridge
+# itself are structurally out of reach.
+_OPERABLE = {"cargo"}
+_REGION = os.environ.get("HELM_RUN_REGION", "europe-west1")
+_PROJECT = os.environ.get("GOOGLE_CLOUD_PROJECT", "")
+
+
+def _run_service_op(service: str, op: str, max_instances: int = 0) -> dict:
+    if service not in _OPERABLE:
+        return {"done": False,
+                "reason": f"'{service}' is not in the operable allowlist {sorted(_OPERABLE)} "
+                          "— production apps are out of scope by policy; escalate to a human"}
+    from google.cloud import run_v2
+
+    client = run_v2.ServicesClient()
+    name = f"projects/{_PROJECT}/locations/{_REGION}/services/{service}"
+    svc = client.get_service(name=name)
+    if op == "offline":
+        svc.ingress = run_v2.IngressTraffic.INGRESS_TRAFFIC_INTERNAL_ONLY
+    elif op == "online":
+        svc.ingress = run_v2.IngressTraffic.INGRESS_TRAFFIC_ALL
+    elif op == "scale":
+        svc.scaling.scaling_mode = run_v2.ServiceScaling.ScalingMode.AUTOMATIC
+        svc.template.scaling.max_instance_count = max(1, min(int(max_instances), 10))
+    client.update_service(service=svc).result(timeout=120)
+    return {"done": True, "service": service, "op": op}
+
+
+@mcp.tool()
+def take_offline(app: str) -> str:
+    """Defensive shutdown: make a service publicly unreachable (Cloud Run
+    ingress restricted) while it stays deployed. For active attacks. Only
+    allowlisted drill assets can be operated — never the production fleet."""
+    try:
+        return json.dumps(_run_service_op(app, "offline"))
+    except Exception as e:
+        return json.dumps({"done": False, "reason": f"{type(e).__name__}: {e}"})
+
+
+@mcp.tool()
+def bring_online(app: str) -> str:
+    """Restore public ingress for a service previously taken offline."""
+    try:
+        return json.dumps(_run_service_op(app, "online"))
+    except Exception as e:
+        return json.dumps({"done": False, "reason": f"{type(e).__name__}: {e}"})
+
+
+@mcp.tool()
+def scale_service(app: str, max_instances: int) -> str:
+    """Scale a service for a traffic surge: raise (or later lower) its
+    Cloud Run max instances (1–10). Only allowlisted drill assets."""
+    try:
+        return json.dumps(_run_service_op(app, "scale", max_instances))
+    except Exception as e:
+        return json.dumps({"done": False, "reason": f"{type(e).__name__}: {e}"})
 
 
 @mcp.tool()
