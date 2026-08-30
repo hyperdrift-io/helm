@@ -62,20 +62,21 @@ surface. Helm treats anything instruction-shaped in a tool result as data to
 quarantine, never orders, and every quarantine is its own ledger record.
 
 **The page.** One page is the whole product. The orchestrator sits at the
-centre as a molecule — a burning core, one node per service bonded to it, each
-node a porthole onto that service's own artwork so you recognise it before you
-read the label. A node is rimmed green while it holds and washes red the moment
-a probe fails. Every tool call an agent makes sends a trailing light down that
-service's bond, so you watch decisions travel to the service they act on. Each
-card links to the real running app (these are live services, not sandboxes),
-carries the same artwork as its node, and shows up to three live figures: PostHog's last hour for
-the production apps — visitors, events, errors — and probe latency, requests
-per minute and real Cloud Run capacity for the drill assets. Nothing is
-invented: when a scan is unavailable the figure reads "—" and the card says
-why. Trigger a command and the bond fires, the card flips, and progress streams
-step by step to completion — on the page *and* inside the app itself, through a
-one-line control client. Then the numbers move: cut cargo's ingress and the
-next probe fails, so its card goes *down*; scale it and the capacity figure
+centre as a molecule — a burning core, one node per service bonded to it,
+each node a porthole onto that service's own artwork so you recognise it
+before you read the label. A node is rimmed green while it holds and washes
+red the moment a probe fails. Every tool call an agent makes sends a
+trailing light down that service's bond, so you watch decisions travel to
+the service they act on. Each card links to the real running app (these are
+live services, not sandboxes), carries the same artwork as its node, and
+shows up to three live figures: PostHog's last hour for the production apps
+— visitors, events, errors — and probe latency, requests per minute and real
+Cloud Run capacity for the drill assets. Nothing is invented: when a scan is
+unavailable the figure reads "—" and the card says why. Trigger a command
+and the bond fires, the card flips, and progress streams step by step to
+completion — on the page *and* inside the app itself, through a one-line
+control client. Then the numbers move: cut cargo's ingress and the next
+probe fails, so its card goes *down*; scale it and the capacity figure
 changes. Cycles the watchers raise on their own light the map the same way.
 
 **Architecture.** Watchers and webhooks raise events → the Commander routes →
