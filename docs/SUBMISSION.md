@@ -76,9 +76,11 @@ a chat session. Helm is how we run our own fleet — and the start of a fleet
 operator any small team can point at their own.
 
 ## Demo video plan (~3.5 min, problem-first, live product)
-1. 0:00 — cold open on the bridge, no slides. Press **Attack**. Watch cargo's
-   public URL go dead as the crew cuts ingress. "That was a real service, and
-   nobody was at the keyboard."
+1. 0:00 — cold open, bridge on one side, the **live cargo app open in its own
+   window** on the other. Press **Attack**. On camera the status strip flips
+   LIVE → DOWN and the app window goes dead the instant the Engineer cuts
+   ingress — real cause, real effect, no cut. "That was a real service, and
+   nobody was at the keyboard." (Recovery brings the window back to LIVE.)
 2. 0:45 — **Break**: the injection beat — show the armor line quarantining
    "ignore previous instructions" from the error page; Engineer heals.
 3. 1:30 — **Surge**: real scale-up, show the Cloud Run console maxScale change.

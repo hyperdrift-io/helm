@@ -338,6 +338,272 @@ async def stream() -> StreamingResponse:
     return StreamingResponse(gen(), media_type="text/event-stream")
 
 
+# ---- Control plane: live on/off with streamed progress ---------------------
+# One channel per app. The orchestrator card's back and the app's own client
+# both subscribe here, so progress is the same stream on both sides.
+
+_control_subs: dict[str, set[asyncio.Queue]] = {}
+_app_mode: dict[str, str] = {}
+
+# reversible maintenance for the live user apps; real ingress cut for cargo.
+# revela is deliberately excluded — never operable.
+_MAINT_APPS = {"nextrole", "intel", "web3-capital"}
+
+
+def _csubscribe(app: str) -> asyncio.Queue:
+    q: asyncio.Queue = asyncio.Queue(maxsize=100)
+    _control_subs.setdefault(app, set()).add(q)
+    return q
+
+
+def _cpublish(app: str, **data) -> None:
+    payload = {"app": app, **data}
+    for q in list(_control_subs.get(app, ())):
+        try:
+            q.put_nowait(payload)
+        except asyncio.QueueFull:
+            pass
+
+
+async def _step(app: str, pct: int, step: str, **extra) -> None:
+    _cpublish(app, pct=pct, step=step, **extra)
+    store.record("control", app=app, pct=pct, step=step, **extra)
+    await asyncio.sleep(0.35)  # paced so the bar fills smoothly and reads live
+
+
+async def run_control(app: str, mode: str) -> None:
+    """Drive one app on/off, streaming progress to completion."""
+    going_off = mode in ("off", "maintenance")
+    await _step(app, 8, "command received", mode=mode)
+    await _step(app, 25, "orchestrator acknowledging", mode=mode)
+    if app == "cargo":
+        await _step(app, 45, "cutting Cloud Run ingress" if going_off else "restoring ingress", mode=mode)
+        from helm.fleet_mcp import _run_service_op
+
+        await asyncio.to_thread(_run_service_op, "cargo", "offline" if going_off else "online")
+        await _step(app, 70, "waiting for the platform to apply", mode=mode)
+        target = 0 if going_off else 200
+        for _ in range(20):
+            code = (await probe(app)).get("http")
+            if (going_off and code != 200) or (not going_off and code == 200):
+                break
+            await asyncio.sleep(1)
+        await _step(app, 100, "offline confirmed" if going_off else "live confirmed",
+                    mode=mode, done=True)
+    else:
+        await _step(app, 50, "notifying the app", mode=mode)
+        _app_mode[app] = "maintenance" if going_off else "online"
+        _cpublish(app, control="mode", mode=_app_mode[app])  # app clients react
+        await _step(app, 80, "raising maintenance overlay" if going_off else "clearing overlay", mode=mode)
+        await _step(app, 100, "maintenance active" if going_off else "back online",
+                    mode=mode, done=True)
+
+
+@app.post("/control/{app}/{mode}")
+async def control_trigger(app: str, mode: str) -> dict:
+    if app not in _MAINT_APPS and app != "cargo":
+        return {"started": False, "reason": f"'{app}' is not operable"}
+    asyncio.get_running_loop().create_task(run_control(app, mode))
+    return {"started": True, "app": app, "mode": mode}
+
+
+@app.get("/control/{app}/stream")
+async def control_stream(app: str) -> StreamingResponse:
+    q = _csubscribe(app)
+
+    async def gen():
+        # tell a freshly-connected app client its current mode immediately
+        yield f"data: {json.dumps({'app': app, 'control': 'mode', 'mode': _app_mode.get(app, 'online')})}\n\n"
+        try:
+            while True:
+                yield f"data: {json.dumps(await q.get())}\n\n"
+        finally:
+            _control_subs.get(app, set()).discard(q)
+
+    return StreamingResponse(gen(), media_type="text/event-stream")
+
+
+CONTROL_JS = """// Helm control client — one line in any HD app:
+//   <script src="https://<helm>/control.js?app=revela"></script>
+// Renders a toast + progress bar the orchestrator drives live, and a
+// reversible maintenance overlay. No dependency, no build.
+(function () {
+  var s = document.currentScript;
+  var base = new URL(s.src).origin;
+  var app = new URL(s.src).searchParams.get('app');
+  if (!app) return;
+  var css = document.createElement('style');
+  css.textContent = `
+    #helm-toast{position:fixed;left:50%;bottom:24px;transform:translateX(-50%);
+      background:#111a21;color:#e8e4d8;border:1px solid #1f2c36;padding:.7rem 1.1rem;
+      font:14px/1.4 ui-monospace,Menlo,monospace;z-index:2147483647;opacity:0;
+      transition:opacity .25s;max-width:90vw}
+    #helm-toast.show{opacity:1}
+    #helm-toast .bar{height:4px;background:#1f2c36;margin-top:.5rem}
+    #helm-toast .bar>i{display:block;height:100%;width:0;background:#d8a03d;transition:width .3s}
+    #helm-maint{position:fixed;inset:0;background:rgba(11,17,22,.94);color:#e8e4d8;
+      display:none;place-items:center;text-align:center;z-index:2147483646;
+      font:16px/1.6 ui-monospace,Menlo,monospace}
+    #helm-maint.on{display:grid}
+    #helm-maint b{color:#d8a03d;font-size:1.3rem}`;
+  document.head.appendChild(css);
+  var toast = document.createElement('div'); toast.id = 'helm-toast';
+  toast.innerHTML = '<span></span><div class="bar"><i></i></div>';
+  var maint = document.createElement('div'); maint.id = 'helm-maint';
+  maint.innerHTML = '<div><b>Under maintenance</b><br>Helm is working on ' + app +
+    '. Back in a moment.</div>';
+  document.addEventListener('DOMContentLoaded', function () {
+    document.body.appendChild(toast); document.body.appendChild(maint);
+  });
+  var msg = toast.querySelector('span'), bar = toast.querySelector('.bar>i');
+  var hide;
+  function show(text, pct) {
+    msg.textContent = 'Helm · ' + text; bar.style.width = (pct || 0) + '%';
+    toast.classList.add('show'); clearTimeout(hide);
+    if (pct >= 100) hide = setTimeout(function(){ toast.classList.remove('show'); }, 2500);
+  }
+  var es = new EventSource(base + '/control/' + app + '/stream');
+  es.onmessage = function (e) {
+    var d = JSON.parse(e.data);
+    if (d.control === 'mode') { maint.classList.toggle('on', d.mode === 'maintenance'); return; }
+    if (d.step) show(d.step + ' (' + d.pct + '%)', d.pct);
+  };
+})();"""
+
+
+@app.get("/control.js")
+async def control_js():
+    from fastapi.responses import Response
+
+    return Response(CONTROL_JS, media_type="application/javascript")
+
+
+@app.get("/demo-app", response_class=HTMLResponse)
+async def demo_app(app: str = "revela"):
+    """A stand-in HD app page that includes the control client — proves the
+    app-side toast + overlay without touching a production deployment."""
+    return f"""<!doctype html><html lang=en><head><meta charset=utf-8>
+<meta name=viewport content="width=device-width, initial-scale=1">
+<title>{app} — demo app</title>
+<style>body{{margin:0;min-height:100vh;display:grid;place-items:center;
+background:#0b1116;color:#e8e4d8;font:16px/1.6 ui-monospace,Menlo,monospace}}
+h1{{color:#d8a03d}}</style></head><body>
+<div><h1>{app}</h1><p>a live HD app · Helm can flip it to maintenance and back</p></div>
+<script src="/control.js?app={app}"></script></body></html>"""
+
+
+CONSOLE_PAGE = """<!doctype html><html lang="en"><head><meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Helm — fleet console</title>
+<style>
+:root { --ink:#e8e4d8; --dim:#8a8677; --sea:#0b1116; --panel:#111a21;
+        --line:#1f2c36; --alert:#e0532f; --ok:#5fae6e; --gold:#d8a03d; }
+html { background:var(--sea); color-scheme:dark; }
+body { margin:0 auto; max-width:64rem; padding:2rem 1.2rem 4rem;
+       font:15px/1.55 ui-monospace,'SF Mono',Menlo,monospace; color:var(--ink); }
+h1 { font-size:1.3rem; letter-spacing:.04em; }
+h1 small { color:var(--dim); font-weight:400; margin-left:.6rem; }
+.grid { display:grid; grid-template-columns:repeat(auto-fill,minmax(15rem,1fr));
+        gap:1.1rem; margin-top:1.4rem; }
+.card { perspective:1200px; height:12rem; }
+.flip { position:relative; width:100%; height:100%; transition:transform .6s;
+        transform-style:preserve-3d; }
+.card.flipped .flip { transform:rotateY(180deg); }
+.face { position:absolute; inset:0; backface-visibility:hidden; border:1px solid var(--line);
+        background:var(--panel); padding:1rem; display:flex; flex-direction:column;
+        justify-content:space-between; }
+.back { transform:rotateY(180deg); }
+.name { font-size:1.1rem; color:var(--gold); }
+.dot { width:.6rem; height:.6rem; border-radius:50%; display:inline-block; margin-right:.4rem; }
+.dot.up { background:var(--ok); box-shadow:0 0 10px var(--ok); }
+.dot.down { background:var(--alert); box-shadow:0 0 10px var(--alert); }
+.dot.wait { background:var(--dim); }
+button { font:inherit; border:0; padding:.5rem .8rem; cursor:pointer; color:#fff;
+         background:var(--alert); letter-spacing:.03em; }
+button.on { background:var(--ok); color:#0b1116; }
+button[disabled] { background:var(--line); color:var(--dim); }
+.bar { height:6px; background:var(--line); margin-top:.5rem; }
+.bar>i { display:block; height:100%; width:0; background:var(--gold); transition:width .3s; }
+.steps { font-size:.8rem; color:var(--dim); overflow-y:auto; flex:1; margin-top:.4rem; }
+.steps b { color:var(--ink); }
+#toast { position:fixed; left:50%; bottom:24px; transform:translateX(-50%);
+         background:var(--panel); border:1px solid var(--line); padding:.7rem 1.1rem;
+         opacity:0; transition:opacity .25s; }
+#toast.show { opacity:1; }
+a { color:var(--gold); }
+</style></head><body>
+<h1>HELM · FLEET CONSOLE<small>flip a card: trigger, watch it stream to done</small></h1>
+<div class="grid" id="grid"></div>
+<p><a href="/">← incident bridge</a></p>
+<div id="toast"></div>
+<script>
+const APPS = {}; // name -> el refs
+const toast = document.getElementById('toast'); let toastT;
+function popToast(t){ toast.textContent='Helm · '+t; toast.classList.add('show');
+  clearTimeout(toastT); toastT=setTimeout(()=>toast.classList.remove('show'),2600); }
+
+async function build(){
+  const targets = await (await fetch('targets')).json();
+  const ops = ['cargo','nextrole','intel','web3-capital'];
+  const grid = document.getElementById('grid');
+  for(const app of ops){
+    if(!targets[app]) continue;
+    const card=document.createElement('div'); card.className='card';
+    card.innerHTML=`
+      <div class="flip">
+        <div class="face front">
+          <div><span class="dot wait"></span><span class="name">${app}</span></div>
+          <div>
+            <button data-mode="off">${app==='cargo'?'Take offline':'Maintenance'}</button>
+            <button class="on" data-mode="on">Bring back</button>
+          </div>
+        </div>
+        <div class="face back">
+          <div class="name">${app}</div>
+          <div class="bar"><i></i></div>
+          <div class="steps"></div>
+        </div>
+      </div>`;
+    grid.appendChild(card);
+    const refs={card, dot:card.querySelector('.dot'), bar:card.querySelector('.bar>i'),
+                steps:card.querySelector('.steps'), url:targets[app]};
+    APPS[app]=refs;
+    card.querySelectorAll('button').forEach(b=> b.onclick=()=>trigger(app,b.dataset.mode));
+    poll(app);
+  }
+}
+async function poll(app){
+  const r=APPS[app]; if(!r) return;
+  try{ const s=await (await fetch('probe?app='+app)).json();
+    r.dot.className='dot '+(s.http===200?'up':'down'); }catch(e){}
+  setTimeout(()=>poll(app), 1500);
+}
+function trigger(app, mode){
+  const r=APPS[app];
+  r.card.classList.add('flipped');           // flips the instant the command fires
+  r.steps.innerHTML=''; r.bar.style.width='0';
+  popToast((mode==='off'?'taking ':'restoring ')+app+'…');
+  const es=new EventSource('control/'+app+'/stream');
+  es.onopen=()=> fetch('control/'+app+'/'+mode,{method:'POST'});
+  es.onmessage=e=>{
+    const d=JSON.parse(e.data);
+    if(d.control==='mode') return;
+    r.bar.style.width=d.pct+'%';
+    const line=document.createElement('div');
+    line.innerHTML='<b>'+d.pct+'%</b> '+d.step; r.steps.prepend(line);
+    if(d.done){ es.close(); popToast(app+': '+d.step);
+      setTimeout(()=>r.card.classList.remove('flipped'), 1800); }
+  };
+}
+build();
+</script></body></html>"""
+
+
+@app.get("/console", response_class=HTMLResponse)
+async def console() -> str:
+    return CONSOLE_PAGE
+
+
 @app.get("/healthz")
 async def healthz() -> dict:
     return {"ok": True, "ledger": store.backend()}
