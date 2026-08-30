@@ -96,7 +96,7 @@ reimagines. Standard open-source libraries used per their licences.
 - [x] Repo public
 - [x] Architecture diagram (served + in repo)
 - [x] Hosted URL live, all drills verified in production
-- [ ] GITHUB_TOKEN with org resource owner → post-mortems file on camera
+- [x] GITHUB_TOKEN (org-scoped, Issues RW) wired — verified: agent filed issue #3 from prod
 - [ ] Demo video recorded (see RECORDING.md) and uploaded
 - [ ] `scripts/reset-demo.sh` run immediately before recording
 - [ ] Founder review gate approved
