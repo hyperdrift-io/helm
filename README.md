@@ -6,9 +6,14 @@ under the watch of an agent crew that detects incidents, heals what it has a
 runbook for, verifies its own fixes, and files post-mortems — end to end,
 nobody at the keyboard.
 
-**Live bridge**: https://helm-294160018950.europe-west1.run.app — press the
-red button. It genuinely breaks a service (real 500s, with a prompt injection
-planted in the error page) and you watch the crew put it back.
+**Live bridge**: https://helm-294160018950.europe-west1.run.app — three red
+buttons, all real. **Break** makes a service serve 500s (with a prompt
+injection planted in the error page) and the crew heals it. **Attack** storms
+the cargo service and the Engineer takes it offline for real — Cloud Run
+ingress cut, public URL dead in seconds. **Surge** floods it with legitimate
+load and the Engineer scales the actual service up, then proves it with a
+config read. The Engineer's infrastructure power is hard-allowlisted to the
+drill assets — the production fleet is structurally out of its reach.
 
 ## The crew
 
@@ -16,7 +21,7 @@ planted in the error page) and you watch the crew put it back.
 |---|---|---|
 | **helm** (Commander) | routes only — holds no tools by design | transfer |
 | **watch_officer** | read-only | fleet status, app detail, ledger memory |
-| **engineer** | act-scoped | heal, verify, file issue, ledger memory |
+| **engineer** | act-scoped | heal, take offline / bring online, scale (Cloud Run Admin API), verify, file issue |
 
 Separation is enforced by construction, not by prompt: each agent gets its
 toolset through an MCP `tool_filter`. The Watch Officer *cannot* act; the
