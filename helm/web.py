@@ -658,6 +658,16 @@ async def console() -> str:
     return CONSOLE_PAGE
 
 
+@app.get("/architecture.svg")
+async def architecture():
+    from fastapi.responses import FileResponse, Response
+
+    p = os.path.join(os.path.dirname(__file__), "..", "assets", "architecture.svg")
+    if os.path.exists(p):
+        return FileResponse(p, media_type="image/svg+xml")
+    return Response("not found", status_code=404)
+
+
 @app.get("/healthz")
 async def healthz() -> dict:
     return {"ok": True, "ledger": store.backend()}

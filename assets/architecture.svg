@@ -1,0 +1,101 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 960 560" width="960" height="560"
+     font-family="ui-monospace, 'SF Mono', Menlo, monospace">
+  <defs>
+    <marker id="a" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto">
+      <path d="M0 0 L10 5 L0 10 z" fill="#8a8677"/>
+    </marker>
+    <marker id="ag" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto">
+      <path d="M0 0 L10 5 L0 10 z" fill="#d8a03d"/>
+    </marker>
+  </defs>
+  <style>
+    .bg{fill:#0b1116}
+    .panel{fill:#111a21;stroke:#1f2c36;stroke-width:1.5}
+    .gold{stroke:#d8a03d}
+    .ok{stroke:#5fae6e}
+    .alert{stroke:#e0532f}
+    text{fill:#e8e4d8;font-size:13px}
+    .t{fill:#8a8677;font-size:11px;letter-spacing:.12em}
+    .lbl{fill:#d8a03d;font-size:13px}
+    .sm{fill:#8a8677;font-size:11px}
+    .ln{stroke:#8a8677;stroke-width:1.4;fill:none;marker-end:url(#a)}
+    .lg{stroke:#d8a03d;stroke-width:1.8;fill:none;marker-end:url(#ag)}
+  </style>
+  <rect class="bg" width="960" height="560"/>
+
+  <text x="24" y="34" class="lbl" font-size="16">HELM</text>
+  <text x="82" y="34" class="sm">an agent crew at the wheel of a live product fleet</text>
+
+  <!-- events in -->
+  <text x="24" y="76" class="t">EVENTS IN</text>
+  <rect class="panel" x="24" y="88" width="176" height="132" rx="2"/>
+  <text x="40" y="112">uptime watcher</text>
+  <text x="40" y="134">signal watcher</text>
+  <text x="40" y="156" class="sm">PostHog exception spikes</text>
+  <text x="40" y="180">/webhook</text>
+  <text x="40" y="202">drill buttons</text>
+
+  <!-- commander -->
+  <text x="264" y="76" class="t">ORCHESTRATION · ADK + GEMINI 3.5</text>
+  <rect class="panel gold" x="264" y="88" width="292" height="132" rx="2"/>
+  <text x="280" y="112" class="lbl">helm · Commander</text>
+  <text x="280" y="130" class="sm">routes only — holds no tools</text>
+  <rect class="panel ok" x="280" y="144" width="128" height="60" rx="2"/>
+  <text x="292" y="166" font-size="12">watch_officer</text>
+  <text x="292" y="184" class="sm">read-only</text>
+  <rect class="panel alert" x="416" y="144" width="124" height="60" rx="2"/>
+  <text x="428" y="166" font-size="12">engineer</text>
+  <text x="428" y="184" class="sm">act-scoped</text>
+
+  <!-- mcp -->
+  <text x="620" y="76" class="t">FLEET MCP · TOOL SURFACE</text>
+  <rect class="panel gold" x="620" y="88" width="316" height="132" rx="2"/>
+  <text x="636" y="112" class="sm">tool_filter per agent — identity by construction</text>
+  <text x="636" y="136">status · detail · signals · recent</text>
+  <text x="636" y="158">heal · take_offline · scale · config</text>
+  <text x="636" y="180">file_github_issue</text>
+  <rect class="panel alert" x="636" y="190" width="180" height="22" rx="2"/>
+  <text x="646" y="205" font-size="11" fill="#e0532f">armor screen · quarantine</text>
+
+  <!-- arrows top row -->
+  <path class="ln" d="M200 154 H258"/>
+  <path class="lg" d="M556 154 H614"/>
+
+  <!-- acted on -->
+  <text x="24" y="286" class="t">ACTED ON</text>
+  <rect class="panel" x="24" y="298" width="360" height="150" rx="2"/>
+  <text x="40" y="322" class="lbl">live fleet — read &amp; diagnose</text>
+  <text x="40" y="344" class="sm">revela · nextrole · intel · web3-capital</text>
+  <text x="40" y="374" class="lbl">drill assets — real actions</text>
+  <text x="40" y="396" class="sm">cargo (billing) · sandbox</text>
+  <text x="40" y="418" class="sm">ingress cut · scale up · heal</text>
+  <text x="40" y="438" fill="#e0532f" font-size="11">allowlist: production apps are never operable</text>
+
+  <!-- google cloud -->
+  <text x="420" y="286" class="t">GOOGLE CLOUD</text>
+  <rect class="panel gold" x="420" y="298" width="240" height="150" rx="2"/>
+  <text x="436" y="322">Cloud Run</text>
+  <text x="436" y="342" class="sm">helm · cargo services</text>
+  <text x="436" y="368">Cloud Run Admin API</text>
+  <text x="436" y="388" class="sm">the Engineer's real ops</text>
+  <text x="436" y="414">Firestore</text>
+  <text x="436" y="434" class="sm">the ledger</text>
+
+  <!-- ledger/bridge -->
+  <text x="696" y="286" class="t">AUDIT &amp; PANE</text>
+  <rect class="panel" x="696" y="298" width="240" height="150" rx="2"/>
+  <text x="712" y="322" class="lbl">ledger</text>
+  <text x="712" y="342" class="sm">every event, tool call,</text>
+  <text x="712" y="360" class="sm">quarantine, verdict</text>
+  <text x="712" y="390" class="lbl">bridge + console</text>
+  <text x="712" y="410" class="sm">live SSE · flip cards</text>
+  <text x="712" y="430" class="sm">nervous-system map</text>
+
+  <path class="lg" d="M700 224 V292"/>
+  <path class="lg" d="M660 224 C660 260 560 260 540 292"/>
+  <path class="lg" d="M640 224 C600 270 340 260 300 292"/>
+  <path class="ln" d="M660 373 H692"/>
+
+  <text x="24" y="498" class="sm">Gemini 3.5 decides · ADK routes the crew · MCP acts · Cloud Run and Firestore run and remember it.</text>
+  <text x="24" y="520" class="sm">Same code self-hosts with a jsonl ledger — the MCP tool surface is the contract, not the runtime.</text>
+</svg>
