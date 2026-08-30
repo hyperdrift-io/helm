@@ -53,6 +53,12 @@ li { padding:.45rem 0; border-bottom:1px solid var(--line); white-space:pre-wrap
 li time { color:var(--dim); margin-right:.7rem; }
 li[data-kind="event"]           { color:var(--gold); }
 li[data-kind="armor"]           { color:var(--alert); }
+#target { display:flex; align-items:center; gap:1rem; font-size:1.1rem; }
+#tstatus { font-weight:700; padding:.3rem .9rem; border:1px solid var(--line); }
+#tstatus[data-http="200"] { color:#0b1116; background:var(--ok); }
+#tstatus[data-http="down"] { color:#fff; background:var(--alert); }
+#tstatus[data-http="idle"] { color:var(--dim); }
+#tname { color:var(--gold); }
 li[data-kind="tool_call"]       { color:var(--dim); }
 li[data-kind="cycle_end"]       { color:var(--ok); }
 li[data-kind="cycle_end"] b     { color:var(--ink); }
@@ -74,6 +80,17 @@ Engineer heals it; <b>attack</b> storms the cargo service and the Engineer
 takes it offline for real (Cloud Run ingress cut); <b>surge</b> floods it
 with legitimate load and the Engineer scales the real service up. Diagnose →
 act → verify → post-mortem, every time. One drill per minute.</p>
+</section>
+<section>
+<h2>Live target — the app the crew is acting on, right now</h2>
+<div id="target">
+  <span id="tstatus" data-http="idle">idle</span>
+  <span id="tname"></span>
+  <a id="topen" href="#" target="cargo_live" hidden>open the live app in its own window ↗</a>
+</div>
+<p>When a drill runs, this strip polls the real app twice a second — watch it
+go dead the instant the Engineer cuts ingress, and come back when it recovers.
+The app opens in its own window so you see the real effect land in real time.</p>
 </section>
 <section>
 <h2>Crew manifest — who exists, what identity, which tools</h2>
@@ -114,10 +131,32 @@ fetch('crew').then(r=>r.json()).then(c => {
   }
 });
 new EventSource('stream').onmessage = e => row(JSON.parse(e.data));
+let watching = null;
+const tstatus = document.getElementById('tstatus');
+const tname = document.getElementById('tname');
+const topen = document.getElementById('topen');
+async function pollTarget() {
+  if (!watching) return;
+  try {
+    const s = await (await fetch('probe?app=' + watching)).json();
+    if (s.http === 200) { tstatus.dataset.http = '200'; tstatus.textContent =
+        'LIVE · ' + s.latency_ms + 'ms'; }
+    else { tstatus.dataset.http = 'down'; tstatus.textContent =
+        'DOWN · ' + (s.error || ('HTTP ' + s.http)); }
+  } catch (e) {}
+}
+setInterval(pollTarget, 500);
+function watch(app, url) {
+  watching = app; tname.textContent = app; topen.href = url; topen.hidden = false;
+  tstatus.dataset.http = 'idle'; tstatus.textContent = 'probing…';
+  window.open(url, 'cargo_live', 'width=520,height=440');
+  pollTarget();
+}
 for (const [id, path] of [['drill','drill'],['attack','drill/attack'],['surge','drill/surge']])
   document.getElementById(id).onclick = async ev => {
     ev.target.disabled = true;
-    await fetch(path, {method:'POST'});
+    const r = await (await fetch(path, {method:'POST'})).json();
+    if (r.watch) watch(r.watch, r.url);
     setTimeout(()=>{ ev.target.disabled = false; }, 60000);
   };
 </script></body></html>"""
@@ -133,6 +172,34 @@ async def crew() -> dict:
     from helm.agent import CREW
 
     return CREW
+
+
+@app.get("/targets")
+async def targets() -> dict:
+    """Public URLs the bridge can open in a live window per app."""
+    from helm.fleet_mcp import FLEET
+
+    return {name: app["url"] for name, app in FLEET.items()
+            if app["url"].startswith("http") and "localhost" not in app["url"]}
+
+
+@app.get("/probe")
+async def probe(app: str) -> dict:
+    """Live status of one app's public URL — the bridge polls this so the
+    status strip changes in real time as the crew acts. CORS-safe proxy."""
+    from helm.fleet_mcp import FLEET
+
+    info = FLEET.get(app)
+    if not info:
+        return {"app": app, "http": 0, "error": "unknown"}
+    t0 = time.monotonic()
+    try:
+        async with httpx.AsyncClient(follow_redirects=True, timeout=6) as c:
+            r = await c.get(info["url"])
+        return {"app": app, "http": r.status_code,
+                "latency_ms": round((time.monotonic() - t0) * 1000), "url": info["url"]}
+    except Exception as e:
+        return {"app": app, "http": 0, "error": type(e).__name__, "url": info["url"]}
 
 
 @app.get("/recent")
@@ -160,7 +227,9 @@ async def drill() -> dict:
              "source": "bridge_red_button"}
     store.record("event", event=event, event_desc="red button: sandbox service now failing for 2 min")
     await events.put(event)
-    return {"queued": True, "sandbox_broken_for_s": 120}
+    return {"queued": True, "watch": "sandbox",
+            "url": os.environ.get("HELM_SANDBOX_URL", "http://localhost:8080/sandbox"),
+            "sandbox_broken_for_s": 120}
 
 
 async def _storm(url: str, n: int, seconds: int) -> None:
@@ -193,7 +262,7 @@ async def drill_attack() -> dict:
     store.record("event", event=event,
                  event_desc="red button: attack traffic now hitting cargo")
     await events.put(event)
-    return {"queued": True}
+    return {"queued": True, "watch": "cargo", "url": cargo}
 
 
 @app.post("/drill/surge")
@@ -214,7 +283,7 @@ async def drill_surge() -> dict:
     store.record("event", event=event,
                  event_desc="red button: traffic surge now hitting cargo")
     await events.put(event)
-    return {"queued": True}
+    return {"queued": True, "watch": "cargo", "url": cargo}
 
 
 @app.get("/sandbox")
