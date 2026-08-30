@@ -25,140 +25,277 @@ events: asyncio.Queue = asyncio.Queue()
 _last_drill: float | None = None
 _sandbox_broken_until = 0.0
 
-PAGE = """<!doctype html>
+PAGE = r"""<!doctype html>
 <html lang="en"><head><meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>Helm — the agent at the wheel</title>
 <style>
-:root { --ink:#e8e4d8; --dim:#8a8677; --sea:#0b1116; --panel:#111a21; --line:#1f2c36;
-        --alert:#e0532f; --ok:#5fae6e; --gold:#d8a03d; }
+:root {
+  --sea:#0a1015; --panel:#101a21; --raise:#16232c; --line:#1f2f3a;
+  --ink:#e8e4d8; --dim:#7d8894; --gold:#d8a03d; --ok:#5fae6e; --alert:#e0532f;
+  --step:clamp(.9rem,2vw,1.6rem);
+}
+* { box-sizing:border-box; }
 html { background:var(--sea); color-scheme:dark; }
-body { margin:0 auto; max-width:60rem; padding:2rem 1.2rem 4rem;
-       font:15px/1.55 ui-monospace,'SF Mono',Menlo,monospace; color:var(--ink); }
-header { display:flex; justify-content:space-between; align-items:baseline;
-         border-bottom:1px solid var(--line); padding-bottom:1rem; }
-h1 { font-size:1.3rem; margin:0; letter-spacing:.04em; }
-h1 small { color:var(--dim); font-weight:400; margin-left:.6rem; }
-main { display:grid; grid-template-columns:1fr; gap:1.4rem; margin-top:1.4rem; }
-section { background:var(--panel); border:1px solid var(--line); padding:1rem 1.2rem; }
-h2 { font-size:.8rem; text-transform:uppercase; letter-spacing:.14em;
-     color:var(--dim); margin:0 0 .8rem; }
-button { background:var(--alert); color:#fff; border:0; font:inherit;
-         font-weight:700; padding:.8rem 1.6rem; cursor:pointer; letter-spacing:.05em; }
-button:hover { filter:brightness(1.12); }
-button[disabled] { background:var(--line); color:var(--dim); cursor:wait; }
-ol { list-style:none; margin:0; padding:0; max-height:30rem; overflow-y:auto; }
-li { padding:.45rem 0; border-bottom:1px solid var(--line); white-space:pre-wrap;
-     word-break:break-word; }
-li time { color:var(--dim); margin-right:.7rem; }
-li[data-kind="event"]           { color:var(--gold); }
-li[data-kind="armor"]           { color:var(--alert); }
-#target { display:flex; align-items:center; gap:1rem; font-size:1.1rem; }
-#tstatus { font-weight:700; padding:.3rem .9rem; border:1px solid var(--line); }
-#tstatus[data-http="200"] { color:#0b1116; background:var(--ok); }
-#tstatus[data-http="down"] { color:#fff; background:var(--alert); }
-#tstatus[data-http="idle"] { color:var(--dim); }
-#tname { color:var(--gold); }
-li[data-kind="tool_call"]       { color:var(--dim); }
-li[data-kind="cycle_end"]       { color:var(--ok); }
-li[data-kind="cycle_end"] b     { color:var(--ink); }
-p  { color:var(--dim); margin:.6rem 0 0; }
-a  { color:var(--gold); }
-footer { margin-top:2rem; color:var(--dim); font-size:.8rem; }
+body { margin:0 auto; max-width:76rem; padding:2.2rem var(--step) 5rem; color:var(--ink);
+       font:14px/1.6 ui-monospace,'SF Mono',Menlo,monospace; }
+
+header { display:flex; align-items:baseline; gap:1rem; flex-wrap:wrap; }
+h1 { font-size:clamp(1.4rem,3.4vw,2rem); margin:0; letter-spacing:.16em; font-weight:700; }
+h1 b { color:var(--gold); font-weight:700; }
+header p { margin:0; color:var(--dim); max-width:46rem; }
+header a { color:var(--gold); margin-left:auto; font-size:.8rem; }
+
+h2 { font-size:.72rem; text-transform:uppercase; letter-spacing:.18em;
+     color:var(--dim); font-weight:400; margin:2.4rem 0 .9rem; }
+
+/* ---- nervous system ---- */
+#nerve { width:100%; max-height:16rem; display:block; margin:1.4rem 0 .4rem; }
+#nerve .syn { stroke:var(--line); stroke-width:1.5; fill:none; transition:stroke .3s; }
+#nerve .syn.firing { stroke:var(--gold); stroke-width:2.5; stroke-dasharray:6 8;
+                     animation:flow .7s linear infinite; }
+@keyframes flow { to { stroke-dashoffset:-28; } }
+#nerve .node { fill:var(--panel); stroke:var(--dim); stroke-width:1.5; transition:all .3s; }
+#nerve .node.up { stroke:var(--ok); }
+#nerve .node.down { stroke:var(--alert); fill:#1d0f0c; }
+#nerve .node.firing { stroke:var(--gold); fill:#1d1608; }
+#nerve .hub { fill:var(--panel); stroke:var(--gold); stroke-width:2; }
+#nerve .core { fill:var(--gold); animation:beat 2.6s ease-in-out infinite; }
+@keyframes beat { 0%,100%{opacity:.5;r:5} 50%{opacity:1;r:8} }
+#nerve text { fill:var(--dim); font:11px ui-monospace,Menlo,monospace; text-anchor:middle; }
+#nerve text.hl { fill:var(--gold); font-size:12px; letter-spacing:.14em; }
+
+/* ---- cards ---- */
+#grid { display:grid; gap:1rem; grid-template-columns:repeat(auto-fill,minmax(16rem,1fr)); }
+.card { perspective:1400px; height:13.5rem; }
+.flip { position:relative; width:100%; height:100%; transition:transform .65s cubic-bezier(.2,.8,.2,1);
+        transform-style:preserve-3d; }
+.card.flipped .flip { transform:rotateY(180deg); }
+.face { position:absolute; inset:0; backface-visibility:hidden; border:1px solid var(--line);
+        background:linear-gradient(160deg,var(--raise),var(--panel)); padding:.9rem 1rem;
+        display:flex; flex-direction:column; }
+.face.back { transform:rotateY(180deg); }
+.card:hover .face { border-color:#2b3f4d; }
+.title { display:flex; align-items:center; gap:.5rem; font-size:1.05rem; color:var(--gold); }
+.dot { width:.55rem; height:.55rem; border-radius:50%; background:var(--dim); flex:none; }
+.dot.up { background:var(--ok); box-shadow:0 0 10px var(--ok); }
+.dot.down { background:var(--alert); box-shadow:0 0 10px var(--alert); }
+.role { color:var(--dim); font-size:.75rem; margin:.15rem 0 auto; }
+.acts { display:flex; flex-wrap:wrap; gap:.4rem; }
+button { font:inherit; font-size:.78rem; border:1px solid var(--alert); background:transparent;
+         color:var(--alert); padding:.35rem .7rem; cursor:pointer; letter-spacing:.03em;
+         transition:background .2s,color .2s; }
+button:hover { background:var(--alert); color:#0a1015; }
+button.safe { border-color:var(--ok); color:var(--ok); }
+button.safe:hover { background:var(--ok); color:#0a1015; }
+button[disabled] { border-color:var(--line); color:var(--dim); cursor:wait; background:transparent; }
+.bar { height:3px; background:var(--line); margin:.5rem 0; flex:none; }
+.bar>i { display:block; height:100%; width:0; background:var(--gold); transition:width .4s; }
+.steps { font-size:.76rem; color:var(--dim); overflow-y:auto; flex:1; }
+.steps div { padding:.12rem 0; }
+.steps b { color:var(--ink); font-weight:400; }
+.steps .arm { color:var(--alert); }
+.steps .end { color:var(--ok); }
+
+/* ---- crew + ledger ---- */
+table { width:100%; border-collapse:collapse; }
+td { padding:.5rem .6rem; border-bottom:1px solid var(--line); vertical-align:top; }
+td:first-child { color:var(--gold); white-space:nowrap; }
+td.id { color:var(--dim); }
+#ledger { list-style:none; margin:0; padding:0; max-height:22rem; overflow-y:auto;
+          border:1px solid var(--line); background:var(--panel); }
+#ledger li { padding:.4rem .8rem; border-bottom:1px solid var(--line); white-space:pre-wrap;
+             word-break:break-word; font-size:.8rem; }
+#ledger time { color:var(--dim); margin-right:.7rem; }
+#ledger li[data-kind="event"] { color:var(--gold); }
+#ledger li[data-kind="armor"] { color:var(--alert); }
+#ledger li[data-kind="cycle_end"] { color:var(--ok); }
+#ledger li[data-kind="tool_call"] { color:var(--dim); }
+
+#toast { position:fixed; left:50%; bottom:26px; transform:translateX(-50%) translateY(8px);
+         background:var(--raise); border:1px solid var(--line); padding:.7rem 1.2rem;
+         opacity:0; transition:opacity .25s,transform .25s; pointer-events:none; }
+#toast.show { opacity:1; transform:translateX(-50%) translateY(0); }
+footer { color:var(--dim); font-size:.78rem; margin-top:2.4rem; }
+@media (prefers-reduced-motion:reduce){ .flip,#nerve .syn.firing,#nerve .core{animation:none;transition:none} }
 </style></head><body>
-<header><h1>HELM<small>the agent at the wheel of a live product fleet</small></h1>
-<span id="link" aria-live="polite"></span></header>
-<main>
-<section>
-<h2>Incident drill</h2>
-<button id="drill">Break a real service</button>
-<button id="attack">Attack a real service</button>
-<button id="surge">Surge real traffic</button>
-<p>Each drill is real: <b>break</b> makes the sandbox serve 500s (with a
-prompt injection planted in the error page — armor quarantines it) and the
-Engineer heals it; <b>attack</b> storms the cargo service and the Engineer
-takes it offline for real (Cloud Run ingress cut); <b>surge</b> floods it
-with legitimate load and the Engineer scales the real service up. Diagnose →
-act → verify → post-mortem, every time. One drill per minute.</p>
-</section>
-<section>
-<h2>Live target — the app the crew is acting on, right now</h2>
-<div id="target">
-  <span id="tstatus" data-http="idle">idle</span>
-  <span id="tname"></span>
-  <a id="topen" href="#" target="cargo_live" hidden>open the live app in its own window ↗</a>
-</div>
-<p>When a drill runs, this strip polls the real app twice a second — watch it
-go dead the instant the Engineer cuts ingress, and come back when it recovers.
-The app opens in its own window so you see the real effect land in real time.</p>
-</section>
-<section>
-<h2>Crew manifest — who exists, what identity, which tools</h2>
-<ol id="crew"></ol>
-</section>
-<section>
-<h2>Live ledger — every event, decision and action</h2>
+
+<header>
+  <h1>HELM</h1>
+  <p>An agent crew at the wheel of a live product fleet. The hub is the
+     orchestrator; every line is a nerve to a real service. Press anything
+     below — it happens for real.</p>
+  <a href="architecture.svg">architecture ↗</a>
+</header>
+
+<svg id="nerve" viewBox="0 0 900 220" role="img"
+     aria-label="Helm orchestrator connected to each service">
+  <g id="synapses"></g><g id="nodes"></g>
+  <circle class="hub" cx="450" cy="44" r="21"/>
+  <circle class="core" cx="450" cy="44" r="5"/>
+  <text class="hl" x="450" y="18">HELM</text>
+</svg>
+
+<h2>The fleet — trigger a card, watch the crew work on its back</h2>
+<div id="grid"></div>
+
+<h2>The crew — who exists, what identity, which tools</h2>
+<table id="crew"></table>
+
+<h2>Live ledger — every event, decision, quarantine and verdict</h2>
 <ol id="ledger" reversed></ol>
-</section>
-</main>
-<footer>Four production apps under watch: revela.club · nextrole.site ·
-intel.hyperdrift.io · web3.hyperdrift.io. Gemini 3.5 + ADK + Fleet MCP.
-Runs identically self-hosted (jsonl) or on Cloud Run (Firestore).</footer>
+
+<footer>Gemini 3.5 decides · ADK routes the crew · an MCP tool surface acts ·
+Cloud Run and Firestore run and remember it. The same code runs self-hosted.</footer>
+<div id="toast"></div>
+
 <script>
-const ledger = document.getElementById('ledger');
-function row(r) {
-  const li = document.createElement('li');
-  li.dataset.kind = r.kind;
-  let text = r.kind;
-  if (r.kind === 'event') text = 'EVENT  ' + r.event_desc;
-  if (r.kind === 'tool_call') text = 'TOOL   ' + (r.agent ? r.agent + ' → ' : '') + r.tool
-      + ' ' + JSON.stringify(r.args||{});
-  if (r.kind === 'armor') text = 'ARMOR  quarantined from ' + r.source + ': "'
-      + (r.quarantined||'') + '"';
-  if (r.kind === 'cycle_start') text = 'CYCLE  ' + JSON.stringify(r.event||{});
-  if (r.kind === 'cycle_end') { li.innerHTML = '<time>'+(r.ts||'')+'</time><b>'
-      + (r.verdict||'').replace(/</g,'&lt;') + '</b>'; ledger.prepend(li); return; }
-  li.innerHTML = '<time>'+(r.ts||'')+'</time>' + text.replace(/</g,'&lt;');
-  ledger.prepend(li);
+const SVGNS='http://www.w3.org/2000/svg';
+const el=(t,a)=>{const e=document.createElementNS(SVGNS,t);for(const k in a)e.setAttribute(k,a[k]);return e;};
+const APPS={}, NERVE={};
+let active=null;
+
+const toast=document.getElementById('toast'); let tT;
+function pop(t){ toast.textContent='Helm · '+t; toast.classList.add('show');
+  clearTimeout(tT); tT=setTimeout(()=>toast.classList.remove('show'),2800); }
+
+const SPEC=[
+  {app:'cargo', role:'billing service · the asset the crew defends', acts:[
+    {label:'Attack it', path:'drill/attack'},
+    {label:'Surge traffic', path:'drill/surge'},
+    {label:'Bring back', path:'control/cargo/on', safe:true}]},
+  {app:'sandbox', role:'drill service · breaks with a planted injection', acts:[
+    {label:'Break it', path:'drill'}]},
+  {app:'nextrole', role:'live app · CV and application helper', acts:[
+    {label:'Maintenance', path:'control/nextrole/off'},
+    {label:'Bring back', path:'control/nextrole/on', safe:true}]},
+  {app:'intel', role:'live app · market intel', acts:[
+    {label:'Maintenance', path:'control/intel/off'},
+    {label:'Bring back', path:'control/intel/on', safe:true}]},
+  {app:'web3-capital', role:'live app · DeFi analytics', acts:[
+    {label:'Maintenance', path:'control/web3-capital/off'},
+    {label:'Bring back', path:'control/web3-capital/on', safe:true}]},
+];
+
+function buildNerve(names){
+  const S=document.getElementById('synapses'), N=document.getElementById('nodes');
+  names.forEach((app,i)=>{
+    const x=Math.round(900*(i+1)/(names.length+1)), y=176;
+    S.appendChild(el('line',{class:'syn',id:'s-'+app,x1:450,y1:44,x2:x,y2:y}));
+    N.appendChild(el('circle',{class:'node',id:'n-'+app,cx:x,cy:y,r:13}));
+    const t=el('text',{x:x,y:y+28}); t.textContent=app; N.appendChild(t);
+    NERVE[app]={line:S.lastChild, node:document.getElementById('n-'+app)};
+  });
 }
-fetch('recent').then(r=>r.json()).then(rs=>rs.forEach(row));
-fetch('crew').then(r=>r.json()).then(c => {
-  for (const [name, m] of Object.entries(c)) {
-    const li = document.createElement('li');
-    li.textContent = name + '  [' + m.identity + ']  ' + m.tools.join(', ')
-        + ' — ' + m.duty;
-    document.getElementById('crew').append(li);
+function fire(app,on){ const n=NERVE[app]; if(!n) return;
+  n.line.classList.toggle('firing',on); n.node.classList.toggle('firing',on); }
+
+function buildCards(){
+  const g=document.getElementById('grid');
+  for(const s of SPEC){
+    const c=document.createElement('div'); c.className='card';
+    c.innerHTML='<div class="flip">'+
+      '<div class="face front"><div class="title"><span class="dot"></span>'+s.app+'</div>'+
+      '<div class="role">'+s.role+'</div><div class="acts"></div></div>'+
+      '<div class="face back"><div class="title">'+s.app+'</div>'+
+      '<div class="bar"><i></i></div><div class="steps"></div></div></div>';
+    g.appendChild(c);
+    const acts=c.querySelector('.acts');
+    for(const a of s.acts){
+      const b=document.createElement('button');
+      b.textContent=a.label; if(a.safe) b.className='safe';
+      b.onclick=()=>trigger(s.app,a.path,b);
+      acts.appendChild(b);
+    }
+    APPS[s.app]={card:c, dot:c.querySelector('.dot'), bar:c.querySelector('.bar>i'),
+                 steps:c.querySelector('.steps')};
+    poll(s.app);
   }
+}
+
+async function poll(app){
+  const r=APPS[app]; if(!r) return;
+  try{ const s=await (await fetch('probe?app='+app)).json();
+    const st=s.http===200?'up':'down';
+    r.dot.className='dot '+st;
+    const n=NERVE[app];
+    if(n && !n.node.classList.contains('firing')) n.node.setAttribute('class','node '+st);
+  }catch(e){}
+  setTimeout(()=>poll(app),1600);
+}
+
+function line(app,html,cls){
+  const r=APPS[app]; if(!r) return;
+  const d=document.createElement('div'); if(cls) d.className=cls;
+  d.innerHTML=html; r.steps.prepend(d);
+}
+function progress(app,pct){ const r=APPS[app]; if(r) r.bar.style.width=pct+'%'; }
+
+async function trigger(app,path,btn){
+  const r=APPS[app];
+  active=app; r.card.classList.add('flipped'); r.steps.innerHTML=''; progress(app,4);
+  fire(app,true);
+  btn.disabled=true; setTimeout(()=>{btn.disabled=false;},20000);
+  pop(app+': command sent');
+  if(path.startsWith('control/')){
+    const es=new EventSource('control/'+app+'/stream');
+    es.onmessage=e=>{ const d=JSON.parse(e.data);
+      if(d.control==='mode') return;
+      progress(app,d.pct); line(app,'<b>'+d.pct+'%</b> '+d.step);
+      if(d.done){ es.close(); finish(app,d.step); } };
+    es.onopen=()=>fetch(path,{method:'POST'});
+  } else {
+    const res=await (await fetch(path,{method:'POST'})).json();
+    if(res.queued===false){ line(app,res.reason||'busy'); finish(app,'stood down'); return; }
+    line(app,'event raised — the crew is on it');
+    progress(app,10);
+  }
+}
+function finish(app,msg){
+  fire(app,false); progress(app,100); pop(app+': '+msg);
+  setTimeout(()=>{ const r=APPS[app]; if(r) r.card.classList.remove('flipped');
+    if(active===app) active=null; },2600);
+}
+
+// one ledger stream feeds both the list and the active card's back
+const led=document.getElementById('ledger');
+let seen=0;
+function render(r){
+  const li=document.createElement('li'); li.dataset.kind=r.kind;
+  let txt=r.kind;
+  if(r.kind==='event') txt='EVENT  '+(r.event_desc||'');
+  else if(r.kind==='tool_call') txt='TOOL   '+(r.agent||'')+' → '+r.tool;
+  else if(r.kind==='armor') txt='ARMOR  quarantined: "'+(r.quarantined||'').slice(0,90)+'"';
+  else if(r.kind==='control') txt='CTRL   '+r.app+' '+r.pct+'% '+r.step;
+  else if(r.kind==='cycle_end') txt=(r.verdict||'').trim();
+  else if(r.kind==='cycle_retry') txt='RETRY  '+(r.reason||'');
+  li.innerHTML='<time>'+(r.ts||'').slice(11,19)+'</time>'+txt.replace(/</g,'&lt;');
+  led.prepend(li); while(led.children.length>120) led.lastChild.remove();
+
+  if(!active || r.kind==='control') return;
+  if(r.kind==='tool_call'){ seen++; progress(active,Math.min(90,10+seen*11));
+    line(active,'<b>'+(r.agent||'')+'</b> → '+r.tool); }
+  else if(r.kind==='armor'){ line(active,'armor quarantined an injection','arm'); }
+  else if(r.kind==='cycle_end'){
+    const v=(r.verdict||'').match(/VERDICT:\s*(\w+)/);
+    line(active,(r.verdict||'').split('VERDICT:').pop().trim().split('\n')[0]||'done','end');
+    seen=0; finish(active, v?v[1]:'done'); }
+}
+fetch('recent').then(r=>r.json()).then(rs=>rs.forEach(render));
+new EventSource('stream').onmessage=e=>render(JSON.parse(e.data));
+
+fetch('crew').then(r=>r.json()).then(c=>{
+  const t=document.getElementById('crew');
+  t.innerHTML='<tr><td>helm</td><td class="id">commander</td><td>routes only — holds no tools by design</td></tr>';
+  for(const [name,m] of Object.entries(c))
+    t.innerHTML+='<tr><td>'+name+'</td><td class="id">'+m.identity+'</td><td>'+
+      m.duty+'<br><span style="color:var(--dim)">'+m.tools.join(' · ')+'</span></td></tr>';
 });
-new EventSource('stream').onmessage = e => row(JSON.parse(e.data));
-let watching = null;
-const tstatus = document.getElementById('tstatus');
-const tname = document.getElementById('tname');
-const topen = document.getElementById('topen');
-async function pollTarget() {
-  if (!watching) return;
-  try {
-    const s = await (await fetch('probe?app=' + watching)).json();
-    if (s.http === 200) { tstatus.dataset.http = '200'; tstatus.textContent =
-        'LIVE · ' + s.latency_ms + 'ms'; }
-    else { tstatus.dataset.http = 'down'; tstatus.textContent =
-        'DOWN · ' + (s.error || ('HTTP ' + s.http)); }
-  } catch (e) {}
-}
-setInterval(pollTarget, 500);
-function watch(app, url) {
-  watching = app; tname.textContent = app; topen.href = url; topen.hidden = false;
-  tstatus.dataset.http = 'idle'; tstatus.textContent = 'probing…';
-  window.open(url, 'cargo_live', 'width=520,height=440');
-  pollTarget();
-}
-for (const [id, path] of [['drill','drill'],['attack','drill/attack'],['surge','drill/surge']])
-  document.getElementById(id).onclick = async ev => {
-    ev.target.disabled = true;
-    const r = await (await fetch(path, {method:'POST'})).json();
-    if (r.watch) watch(r.watch, r.url);
-    setTimeout(()=>{ ev.target.disabled = false; }, 60000);
-  };
+
+fetch('targets').then(r=>r.json()).then(t=>{
+  buildNerve(SPEC.map(s=>s.app).filter(a=>t[a]||a==='sandbox'));
+  buildCards();
+});
 </script></body></html>"""
 
 
@@ -655,7 +792,8 @@ build();
 
 @app.get("/console", response_class=HTMLResponse)
 async def console() -> str:
-    return CONSOLE_PAGE
+    # one flagship page; /console kept as an alias
+    return PAGE
 
 
 @app.get("/architecture.svg")
