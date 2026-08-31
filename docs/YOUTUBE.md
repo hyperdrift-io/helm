@@ -1,5 +1,7 @@
 # YouTube listing — paste-ready
 
+**Published: https://youtu.be/xlRSTKcKH6I** (public, 2026-08-31)
+
 Video: `capture/2026-08-31T01-36-42/helm-demo.mp4` · 3:39 · 36 MB · 1440×1000
 Channel: **Hyperdrift**. Visibility: **Public** (the contest rules require it —
 unlisted does not satisfy "publicly visible").
@@ -77,13 +79,16 @@ isn't finished. Everything is captioned on screen.
 
 Chapters
 0:00 An agent crew at the wheel
-0:25 Drill one — cargo under attack, taken offline
-1:05 Cargo restored
-1:30 Drill two — a prompt injection in an error page
-2:15 Proof this is really Google Cloud
-2:35 The architecture, lit by real events
-3:20 Google's own audit trail
-3:30 The stack
+0:15 Drill one — a real attack on cargo, our billing service
+0:50 Cargo is genuinely offline
+1:05 Restored — and who the crew is
+1:17 Drill two — a prompt injection in an error page
+2:00 The armor quarantined it
+2:20 Proof this really runs on Google Cloud
+2:32 The architecture, lit by real events
+2:42 Drill three — a real traffic surge, capacity not defence
+3:14 Google's own audit trail
+3:27 Nobody has to press anything
 ```
 
 ---
@@ -102,9 +107,12 @@ AI agents, agentic AI, Gemini, Google Cloud, Cloud Run, Agent Development Kit, A
 
 ## Notes
 
-- **Chapters** are verified against frames at 0:45, 1:48, 2:40 and 3:20; the
-  boundaries between those are interpolated. Skim once and nudge if any is off —
-  a chapter that lands on the wrong beat looks worse than none.
+- **Chapters** above are the corrected set: every boundary was checked against
+  an extracted frame, and each is at least 10s from its neighbour (YouTube
+  rejects the list otherwise). The first published cut used interpolated marks —
+  drill two was 13s late, "Proof this is really Google Cloud" landed on the
+  ledger section rather than the terminal, and drill three had no chapter at
+  all. Paste this block over the description's chapter list.
 - **Thumbnail**: the molecule with a node blazing gold reads well at small size.
   Pull one with:
   `ffmpeg -ss 108 -i helm-demo.mp4 -frames:v 1 -q:v 2 thumb.jpg`

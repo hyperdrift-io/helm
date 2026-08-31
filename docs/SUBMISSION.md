@@ -11,6 +11,8 @@
 - **Architecture**: `/architecture` — a live page lit by the real event stream,
   so the diagram shows the crew moving rather than a drawing of it
   (static SVG also at `/architecture.svg` and `assets/architecture.svg`)
+- **Demo video**: https://youtu.be/xlRSTKcKH6I — 3:39, public, silent with
+  burned-in captions (see the disclosure below)
 - **Write-up**: [Your Error Page Is a
   Prompt](https://hyperdrift.io/blog/your-error-page-is-a-prompt) — the
   reasoning behind the armor screen, published openly: why a sterner system
@@ -169,16 +171,17 @@ not from memory.
 - [x] Text description — features, technologies, data sources **and learnings**
 - [x] Architecture diagram — live page + static SVG, in repo and served
 - [x] Setup instructions — step-by-step in `README.md`
-- [ ] Demonstration video — see below
+- [x] Demonstration video — https://youtu.be/xlRSTKcKH6I
 
 **Video rules (each one is a disqualification risk, not a preference)**
-- [ ] **≤ 4 minutes.** "If it is longer than 4 minutes, only the first 4 minutes
+- [x] **≤ 4 minutes** (3:39). "If it is longer than 4 minutes, only the first 4 minutes
       may be evaluated" — anything after the cut is not judged
-- [ ] Uploaded to **YouTube or Vimeo**, set **public**, link on the submission form
+- [x] Uploaded to **YouTube**, public — verified resolving 2026-08-31
+      (link still to be pasted into the Devpost form at send-off)
 - [x] English, or English subtitles — satisfied by the burned-in captions
-- [ ] Shows the problem, the value, and a live demo
-- [ ] Shows **unedited live execution proof** (streaming ledger / UI changes)
-- [ ] Shows **visual confirmation the backend runs on Google Cloud** — real
+- [x] Shows the problem, the value, and a live demo
+- [x] Shows **unedited live execution proof** (streaming ledger / UI changes)
+- [x] Shows **visual confirmation the backend runs on Google Cloud** — real
       `gcloud run services describe` output, on screen
 
 **Before recording**

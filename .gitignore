@@ -2,3 +2,8 @@
 data/
 __pycache__/
 req.txt
+
+# demo takes: only the published one is kept (see docs/YOUTUBE.md)
+capture/2026-08-31T00-29-55/
+capture/2026-08-31T01-05-19/
+capture/2026-08-31T01-36-42/frames/
