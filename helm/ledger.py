@@ -34,7 +34,9 @@ LEDGER_JS = """/* Helm — the shared ledger store. One feed, however many views
     if (seen[k]) return false;
     seen[k] = 1;
     records.push(r);
-    if (records.length > CAP) records.shift();
+    /* Forget the key with the record it belongs to, or a page left open on a
+       busy fleet grows an index it never reads again. */
+    if (records.length > CAP) delete seen[key(records.shift())];
     for (var i = 0; i < subs.length; i++) {
       try { subs[i](r, live); } catch (e) { }
     }

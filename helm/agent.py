@@ -18,6 +18,7 @@ from google.adk.agents import LlmAgent
 from google.adk.runners import InMemoryRunner
 from google.adk.tools import McpToolset
 from google.genai import types
+from google.adk.tools.mcp_tool.mcp_session_manager import StdioConnectionParams
 from mcp import StdioServerParameters
 
 from helm import store
@@ -44,11 +45,18 @@ CREW = {
 
 def _toolset(names: list[str]) -> McpToolset:
     return McpToolset(
-        connection_params=StdioServerParameters(
-            command=sys.executable,
-            args=["-m", "helm.fleet_mcp"],
-            # the MCP stdio client strips the environment by default
-            env=dict(os.environ),
+        connection_params=StdioConnectionParams(
+            server_params=StdioServerParameters(
+                command=sys.executable,
+                args=["-m", "helm.fleet_mcp"],
+                # the MCP stdio client strips the environment by default
+                env=dict(os.environ),
+            ),
+            # The default is 5s, which is the cold start of this very process:
+            # on a max-instances 1 service the first cycle after an idle spell
+            # spawns a subprocess that imports ADK, FastAPI and httpx before it
+            # can answer. Losing an incident to that is not a real failure.
+            timeout=30.0,
         ),
         tool_filter=names,
     )
