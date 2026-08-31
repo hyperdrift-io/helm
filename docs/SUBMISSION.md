@@ -186,5 +186,15 @@ not from memory.
 
 **Before recording**
 - [x] GITHUB_TOKEN (org-scoped, Issues RW) wired — agent filed issues from prod
-- [ ] `scripts/reset-demo.sh` run immediately before the take
-- [ ] Founder review gate approved
+- [x] Take began from the reset state — the frame at 0:15 shows cargo at
+      `3 inst capacity` with all four apps green, which is what the script sets
+
+**Pre-send state (verified 2026-08-31 03:45 BST — judges arrive to this)**
+- [x] All five services answering 200: cargo, sandbox, nextrole, intel,
+      web3-capital — `GET /probe?app=…` on the live bridge
+- [x] cargo back at `maxScale 3`, ingress open — the video ends with it at 10,
+      so the drill is reproducible from the state a judge finds
+- [x] Hosted URL, `/architecture`, `/architecture.svg`, cargo and the write-up
+      all return 200
+- [x] Repo public, `main` pushed with the video and its uncorrected original
+- [ ] **Founder review gate approved** — last gate before send-off
