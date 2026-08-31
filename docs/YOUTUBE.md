@@ -85,11 +85,11 @@ Chapters
 1:05 Restored — and who the crew is
 1:17 Drill two — a prompt injection in an error page
 2:00 The armor quarantined it
-2:20 Proof this really runs on Google Cloud
+2:22 Proof this really runs on Google Cloud
 2:32 The architecture, lit by real events
 2:42 Drill three — a real traffic surge, capacity not defence
 3:14 Google's own audit trail
-3:27 Nobody has to press anything
+3:25 Verified on the card — and the watchers carry on alone
 ```
 
 ---
