@@ -344,7 +344,15 @@ document.querySelectorAll('#fire button').forEach(function(b){
 
 const conn = document.getElementById('conn');
 fetch('/recent').then(function(r){ return r.json(); })
-  .then(function(rows){ rows.forEach(function(r){ render(r, false); }); })
+  .then(function(rows){
+    rows.forEach(function(r){ render(r, false); });
+    // Replayed history must not animate, but the last verdict is still the
+    // standing one — otherwise the headline claims nothing has closed while
+    // the stream underneath it shows a closed cycle.
+    for(var i = rows.length - 1; i >= 0; i--){
+      if(rows[i].kind === 'cycle_end'){ verdict(rows[i].verdict); break; }
+    }
+  })
   .catch(function(){});
 const es = new EventSource('/stream');
 es.onopen = function(){ conn.dataset.on = '1'; conn.textContent = 'live'; };
