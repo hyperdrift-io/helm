@@ -34,9 +34,13 @@ def _screen(text: str, source: str) -> str:
     from helm import store
 
     store.record("armor", source=source,
-                 quarantined=text[:160],
+                 quarantined=_INJECTION.search(text).group(0)[:160],
                  note="instruction-shaped content in probe result quarantined")
-    return "[armor: quarantined instruction-shaped content from this response]"
+    # Redact the imperative, keep the evidence around it. Discarding the whole
+    # payload would blind the crew to a result it still needs to reason about —
+    # and because the ledger stores what we caught, a screened ledger read
+    # would otherwise erase itself every time it was consulted.
+    return _INJECTION.sub("[armor: quarantined]", text)
 
 
 def _tool(fn):
