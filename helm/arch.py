@@ -102,6 +102,19 @@ footer { color:var(--dim); font-size:.76rem; margin-top:2.4rem; }
 @media (prefers-reduced-motion:reduce) {
   #map > section, #wires path { transition:none; }
 }
+
+/* ---- moving between the fleet and the architecture ----
+   Cross-document view transitions: the two pages are one continuous surface,
+   so the crew never appears to stop working mid-cycle. Pure CSS — the shared
+   ledger store is what carries the state across. */
+@view-transition { navigation: auto; }
+::view-transition-old(root) { animation: vt-out .22s ease both; }
+::view-transition-new(root) { animation: vt-in .28s ease both; }
+@keyframes vt-out { to { opacity:0; transform:translateY(-6px); } }
+@keyframes vt-in { from { opacity:0; transform:translateY(8px); } }
+@media (prefers-reduced-motion:reduce) {
+  ::view-transition-old(root), ::view-transition-new(root) { animation:none; }
+}
 </style></head><body>
 
 <header>
@@ -190,6 +203,7 @@ footer { color:var(--dim); font-size:.76rem; margin-top:2.4rem; }
 <footer>Gemini 3.5 decides · ADK routes the crew · an MCP tool surface acts ·
 Cloud Run and Firestore run and remember it.</footer>
 
+<script src="/ledger.js"></script>
 <script>
 const REDUCED = matchMedia('(prefers-reduced-motion: reduce)').matches;
 const SVGNS = 'http://www.w3.org/2000/svg';
@@ -323,6 +337,9 @@ function render(r, live){
   li.innerHTML = '<time>' + String(r.ts||'').slice(11,19) + '</time>' + txt.replace(/</g,'&lt;');
   stream.prepend(li);
   while(stream.children.length > 80) stream.lastChild.remove();
+  // A replayed cycle must not re-animate, but its verdict is still the standing
+  // one — records arrive in order, so the last replayed verdict wins.
+  if(r.kind === 'cycle_end') verdict(r.verdict);
   if(live) animate(r);
 }
 
@@ -343,22 +360,9 @@ document.querySelectorAll('#fire button').forEach(function(b){
 });
 
 const conn = document.getElementById('conn');
-fetch('/recent').then(function(r){ return r.json(); })
-  .then(function(rows){
-    rows.forEach(function(r){ render(r, false); });
-    // Replayed history must not animate, but the last verdict is still the
-    // standing one — otherwise the headline claims nothing has closed while
-    // the stream underneath it shows a closed cycle.
-    for(var i = rows.length - 1; i >= 0; i--){
-      if(rows[i].kind === 'cycle_end'){ verdict(rows[i].verdict); break; }
-    }
-  })
-  .catch(function(){});
-const es = new EventSource('/stream');
-es.onopen = function(){ conn.dataset.on = '1'; conn.textContent = 'live'; };
-es.onerror = function(){ delete conn.dataset.on; conn.textContent = 'reconnecting'; };
-es.onmessage = function(e){
-  let r; try { r = JSON.parse(e.data); } catch(err){ return; }
-  if(r && typeof r === 'object') render(r, true);
-};
+Ledger.onConnection(function(on){
+  if(on){ conn.dataset.on = '1'; conn.textContent = 'live'; }
+  else { delete conn.dataset.on; conn.textContent = 'reconnecting'; }
+});
+Ledger.subscribe(render);
 </script></body></html>"""

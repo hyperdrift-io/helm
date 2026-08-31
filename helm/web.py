@@ -190,6 +190,19 @@ footer { color:var(--dim); font-size:.78rem; margin-top:2.4rem; }
   #toast i { animation:none; opacity:1; }
   .figs.moved b { animation:none; }
 }
+
+/* ---- moving between the fleet and the architecture ----
+   Cross-document view transitions: the two pages are one continuous surface,
+   so the crew never appears to stop working mid-cycle. Pure CSS — the shared
+   ledger store is what carries the state across. */
+@view-transition { navigation: auto; }
+::view-transition-old(root) { animation: vt-out .22s ease both; }
+::view-transition-new(root) { animation: vt-in .28s ease both; }
+@keyframes vt-out { to { opacity:0; transform:translateY(-6px); } }
+@keyframes vt-in { from { opacity:0; transform:translateY(8px); } }
+@media (prefers-reduced-motion:reduce) {
+  ::view-transition-old(root), ::view-transition-new(root) { animation:none; }
+}
 </style></head><body>
 
 <header>
@@ -271,6 +284,7 @@ footer { color:var(--dim); font-size:.78rem; margin-top:2.4rem; }
 Cloud Run and Firestore run and remember it. The same code runs self-hosted.</footer>
 <div id="toast" role="status" aria-live="polite"><i></i><b></b><span></span></div>
 
+<script src="/ledger.js"></script>
 <script>
 const SVGNS='http://www.w3.org/2000/svg';
 const el=(t,a)=>{const e=document.createElementNS(SVGNS,t);for(const k in a)e.setAttribute(k,a[k]);return e;};
@@ -618,8 +632,7 @@ function render(r,live){
     line(active,(r.verdict||'').split('VERDICT:').pop().trim().split('\n')[0]||'done','end');
     seen=0; finish(active, v?v[1]:'done'); }
 }
-fetch('recent').then(r=>r.json()).then(rs=>rs.forEach(r=>render(r,false)));
-new EventSource('stream').onmessage=e=>render(JSON.parse(e.data),true);
+Ledger.subscribe(render);   // history, live feed and what survived the navigation
 
 fetch('crew').then(r=>r.json()).then(c=>{
   const t=document.getElementById('crew');
@@ -1174,6 +1187,17 @@ async def art(name: str):
         return FileResponse(p, media_type="image/jpeg",
                             headers={"Cache-Control": "public, max-age=3600"})
     return Response("not found", status_code=404)
+
+
+@app.get("/ledger.js")
+async def ledger_js():
+    """The shared ledger store — both views load this before their own script."""
+    from fastapi.responses import Response
+
+    from helm.ledger import LEDGER_JS
+
+    return Response(LEDGER_JS, media_type="application/javascript",
+                    headers={"Cache-Control": "no-cache"})
 
 
 @app.get("/architecture", response_class=HTMLResponse)
