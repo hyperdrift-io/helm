@@ -11,7 +11,7 @@
 - **Architecture**: `/architecture` — a live page lit by the real event stream,
   so the diagram shows the crew moving rather than a drawing of it
   (static SVG also at `/architecture.svg` and `assets/architecture.svg`)
-- **Demo video**: https://youtu.be/xlRSTKcKH6I — 3:39, public, silent with
+- **Demo video**: https://youtu.be/EFiuYDQqPDw — 3:39, public, silent with
   burned-in captions (see the disclosure below)
 - **Write-up**: [Your Error Page Is a
   Prompt](https://hyperdrift.io/blog/your-error-page-is-a-prompt) — the
@@ -171,7 +171,7 @@ not from memory.
 - [x] Text description — features, technologies, data sources **and learnings**
 - [x] Architecture diagram — live page + static SVG, in repo and served
 - [x] Setup instructions — step-by-step in `README.md`
-- [x] Demonstration video — https://youtu.be/xlRSTKcKH6I
+- [x] Demonstration video — https://youtu.be/EFiuYDQqPDw
 
 **Video rules (each one is a disqualification risk, not a preference)**
 - [x] **≤ 4 minutes** (3:39). "If it is longer than 4 minutes, only the first 4 minutes
