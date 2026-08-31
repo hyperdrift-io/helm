@@ -11,6 +11,12 @@
 - **Architecture**: `/architecture` — a live page lit by the real event stream,
   so the diagram shows the crew moving rather than a drawing of it
   (static SVG also at `/architecture.svg` and `assets/architecture.svg`)
+- **Write-up**: [Your Error Page Is a
+  Prompt](https://hyperdrift.io/blog/your-error-page-is-a-prompt) — the
+  reasoning behind the armor screen, published openly: why a sterner system
+  prompt is the wrong answer, why identity has to be enforced by toolset, and
+  why an agent must verify its own action instead of trusting an API's
+  acknowledgement
 
 ## Google stack (required)
 - **Gemini 3.5 Flash** via Vertex AI — every decision in every cycle
