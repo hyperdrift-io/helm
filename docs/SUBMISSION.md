@@ -136,6 +136,20 @@ Deploy: `gcloud run deploy helm --source . --region europe-west1`
 `POSTHOG_API_KEY`, `GITHUB_TOKEN`; keep `--max-instances 1` — the watcher is
 one pair of eyes.) Full detail in the README.
 
+## About the video (disclosure)
+
+Silent by design, with burned-in captions. A demo that only works when someone
+talks over it excludes deaf and hard-of-hearing viewers and privileges one
+accent — and if the screen can't carry the story, the screen isn't finished.
+Everything on it is live: the ledger, the figures, the verdicts.
+
+One technical note, so "unedited" is not doing quiet work. The browser recorder
+stamps dropped frames at a nominal 25fps, so the raw file plays about 10% slower
+than the session actually ran. The published cut rescales the timestamps to the
+recording's measured wall clock. Every frame is kept, in order — nothing is cut,
+sped through, or reordered; it restores real time rather than departing from it.
+The uncorrected original is preserved alongside it in the repo.
+
 ## Pre-existing code disclosure (per rules)
 All agent, orchestration, MCP, console and service code in this repository was
 written during the submission period. Pre-existing and disclosed: the four live
