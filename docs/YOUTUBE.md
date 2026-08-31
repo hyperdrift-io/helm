@@ -1,8 +1,10 @@
 # YouTube listing — paste-ready
 
-**Published: https://youtu.be/EFiuYDQqPDw** (public, 2026-08-31)
+**Currently published (1x capture, superseded): https://youtu.be/EFiuYDQqPDw**
+**To upload: the 2x master below — replaces it.**
 
-Video: `capture/2026-08-31T01-36-42/helm-demo.mp4` · 3:39 · 36 MB · 1440×1000
+Video: `capture/2026-08-31T04-36-38/helm-demo.mp4` · 3:41 · 68 MB · 2560x1440
+Captured at 2880x2000 over CDP screencast (7,723 frames, ~35fps), encoded crf 16.
 Channel: **Yann VR** — not the Hyperdrift channel.
 Visibility: **Public** (the rules require it — unlisted does not satisfy
 "publicly visible").
@@ -80,16 +82,17 @@ isn't finished. Everything is captioned on screen.
 
 Chapters
 0:00 An agent crew at the wheel
-0:15 Drill one — a real attack on cargo, our billing service
-0:50 Cargo is genuinely offline
-1:05 Restored — and who the crew is
-1:17 Drill two — a prompt injection in an error page
-2:00 The armor quarantined it
-2:22 Proof this really runs on Google Cloud
-2:32 The architecture, lit by real events
-2:42 Drill three — a real traffic surge, capacity not defence
-3:14 Google's own audit trail
-3:25 Verified on the card — and the watchers carry on alone
+0:18 Drill one — a real attack on cargo, our billing service
+0:42 Cargo is genuinely offline
+0:53 Restored — and who the crew is
+1:08 Drill two — a prompt injection in an error page
+1:31 The armor quarantined it
+1:58 Every step is on the record
+2:09 Proof this really runs on Google Cloud
+2:19 The architecture, lit by real events
+2:29 Drill three — a real traffic surge, capacity not defence
+3:13 Google's own audit trail
+3:28 The card agrees — and the watchers carry on alone
 ```
 
 ---
@@ -108,14 +111,15 @@ AI agents, agentic AI, Gemini, Google Cloud, Cloud Run, Agent Development Kit, A
 
 ## Notes
 
-- **Chapters** above are the corrected set: every boundary was checked against
-  an extracted frame, and each is at least 10s from its neighbour (YouTube
-  rejects the list otherwise). The first published cut used interpolated marks —
-  drill two was 13s late, "Proof this is really Google Cloud" landed on the
-  ledger section rather than the terminal, and drill three had no chapter at
-  all. Paste this block over the description's chapter list.
+- **Chapters** are taken from the run's own beat log, which timestamps every
+  caption as it fires, and the frame timing is real (see below) — so they are
+  measured, not interpolated. All are >=10s apart; YouTube rejects closer.
+
 - **Thumbnail**: the molecule with a node blazing gold reads well at small size.
   Pull one with:
   `ffmpeg -ss 108 -i helm-demo.mp4 -frames:v 1 -q:v 2 thumb.jpg`
-- Do not upload `helm-demo-raw-uncorrected.webm` — it is the 4:04 original kept
-  for provenance, and it plays ~10% slow.
+- `helm-demo-raw-uncorrected.webm` is Playwright's own low-resolution recording,
+  kept only as a fallback witness. Do not upload it.
+- **No timebase correction this time.** The master is built from screencast
+  frames, each held for the real interval between paints, so it already runs at
+  the speed the take happened.

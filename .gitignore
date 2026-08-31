@@ -3,7 +3,18 @@ data/
 __pycache__/
 req.txt
 
-# demo takes: only the published one is kept (see docs/YOUTUBE.md)
+# demo takes: only the published take's video files are tracked. The screencast
+# frames are the raw material (7k+ jpgs, >1GB) and the superseded takes are noise.
+capture/*/frames-hi/
+capture/*/frames/
+capture/*/*.txt
 capture/2026-08-31T00-29-55/
 capture/2026-08-31T01-05-19/
-capture/2026-08-31T01-36-42/frames/
+capture/2026-08-31T01-36-42/
+capture/2026-08-31T04-08-33/
+capture/2026-08-31T04-11-04/
+capture/2026-08-31T04-21-45/
+capture/*/helm-demo-lowres-fallback.mp4
+
+# transient: symlink to the npx playwright cache used by scripts/capture-demo.mjs
+node_modules

@@ -145,12 +145,10 @@ talks over it excludes deaf and hard-of-hearing viewers and privileges one
 accent — and if the screen can't carry the story, the screen isn't finished.
 Everything on it is live: the ledger, the figures, the verdicts.
 
-One technical note, so "unedited" is not doing quiet work. The browser recorder
-stamps dropped frames at a nominal 25fps, so the raw file plays about 10% slower
-than the session actually ran. The published cut rescales the timestamps to the
-recording's measured wall clock. Every frame is kept, in order — nothing is cut,
-sped through, or reordered; it restores real time rather than departing from it.
-The uncorrected original is preserved alongside it in the repo.
+One technical note, so "unedited" is not doing quiet work. The video is built
+from Chrome's own screencast frames: each frame is held for the exact interval
+before the next one was painted, then resampled to 30fps. Every frame is kept,
+in order — nothing is cut, sped through, or reordered.
 
 ## Pre-existing code disclosure (per rules)
 All agent, orchestration, MCP, console and service code in this repository was
@@ -174,7 +172,7 @@ not from memory.
 - [x] Demonstration video — https://youtu.be/EFiuYDQqPDw
 
 **Video rules (each one is a disqualification risk, not a preference)**
-- [x] **≤ 4 minutes** (3:39). "If it is longer than 4 minutes, only the first 4 minutes
+- [x] **≤ 4 minutes** (3:41). "If it is longer than 4 minutes, only the first 4 minutes
       may be evaluated" — anything after the cut is not judged
 - [x] Uploaded to **YouTube**, public — verified resolving 2026-08-31
       (link still to be pasted into the Devpost form at send-off)

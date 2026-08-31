@@ -31,7 +31,7 @@
  * Output: <repo>/capture/<timestamp>/helm-demo.webm  (path printed at the end)
  */
 import { execFileSync } from 'node:child_process';
-import { mkdirSync, readdirSync, renameSync } from 'node:fs';
+import { mkdirSync, readdirSync, renameSync, writeFileSync, rmSync } from 'node:fs';
 import { join, dirname, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
 
@@ -49,6 +49,10 @@ mkdirSync(OUT, { recursive: true });
 // the frame during a drill — the bond particles and the card steps are the same
 // story and must not be split across two shots.
 const W = 1440, H = 1000;
+// Playwright records at CSS-pixel size: deviceScaleFactor does not reach the
+// video pipeline, and a recordVideo.size larger than the viewport just letterboxes
+// the same pixels into a bigger canvas. Real 2x needs a doubled viewport plus
+// `zoom: 2`, which moves the card-grid breakpoint — i.e. a reframe, not a flag.
 // The caption sits in an opaque letterbox band across the bottom BAND px. At
 // scrollY 130 the first card row ends at viewport 880, four pixels clear of the
 // band — so a caption never sits on top of a live card. (The second row is
@@ -170,7 +174,11 @@ const browser = await chromium.launch({
 });
 const ctx = await browser.newContext({
   viewport: { width: W, height: H },
-  deviceScaleFactor: 1,
+  // 2 device pixels per CSS pixel. This does NOT move the layout — dsf changes
+  // what Chrome paints, never what it lays out — but it is invisible to
+  // Playwright's own video encoder, which samples at CSS size. The frames we
+  // actually keep come off CDP screencast below, which does see it.
+  deviceScaleFactor: 2,
   reducedMotion: 'no-preference',
   recordVideo: { dir: OUT, size: { width: W, height: H } },
 });
@@ -245,6 +253,26 @@ await ctx.addInitScript((band) => {
 }, BAND);
 
 const page = await ctx.newPage();
+
+// ---- high-resolution capture -------------------------------------------------
+// Playwright's recordVideo is kept as a safety net, but the master is built from
+// CDP screencast frames: Chrome hands them over at device resolution (2880x2000),
+// so the text is painted at 2x instead of being resampled from a 1x raster.
+const FRAMES = join(OUT, 'frames-hi');
+mkdirSync(FRAMES, { recursive: true });
+const shots = [];
+const cdp = await ctx.newCDPSession(page);
+await cdp.send('Page.enable');
+cdp.on('Page.screencastFrame', async ({ data, sessionId, metadata }) => {
+  const f = join(FRAMES, String(shots.length).padStart(6, '0') + '.jpg');
+  try {
+    writeFileSync(f, Buffer.from(data, 'base64'));
+    shots.push({ f, t: metadata.timestamp });
+  } catch { /* a dropped frame is survivable; a crashed capture is not */ }
+  try { await cdp.send('Page.screencastFrameAck', { sessionId }); } catch {}
+});
+await cdp.send('Page.startScreencast',
+  { format: 'jpeg', quality: 92, maxWidth: W * 2, maxHeight: H * 2, everyNthFrame: 1 });
 
 /** Put a caption up and hold it long enough to read. tone: '' | 'ok' | 'bad'. */
 async function say(label, text, tone = '', extra = 0) {
@@ -614,8 +642,48 @@ try {
 } finally {
   beat('closing — flushing video');
   const wallSec = (Date.now() - videoStart) / 1000;
+  try { await cdp.send('Page.stopScreencast'); } catch {}
+  await new Promise((r) => setTimeout(r, 400));   // let the last acks land
   await ctx.close();
   await browser.close();
+
+  // ---- build the master from the screencast frames --------------------------
+  // Frames arrive when Chrome paints, not on a clock, so each one is held for
+  // exactly the gap to the next before the whole thing is resampled to 30fps.
+  // That keeps real time without inventing motion the page never made.
+  let hiOk = false;
+  if (shots.length > 30) {
+    const hi = join(OUT, 'helm-demo.mp4');
+    const list = join(OUT, 'frames.txt');
+    const lines = [];
+    for (let i = 0; i < shots.length; i++) {
+      // No upper clamp. Chrome only emits a frame when it repaints, so a still
+      // page produces one frame and a long gap — that gap IS the pause the
+      // viewer saw. Capping it (an earlier version capped at 2s) silently drops
+      // real seconds and the take comes out fast.
+      const d = i + 1 < shots.length
+        ? Math.max(0.001, shots[i + 1].t - shots[i].t)
+        : 1 / 30;
+      lines.push(`file '${shots[i].f.replace(/'/g, "'\\''")}'`, `duration ${d.toFixed(4)}`);
+    }
+    lines.push(`file '${shots[shots.length - 1].f}'`);   // concat needs the last one twice
+    writeFileSync(list, lines.join('\n') + '\n');
+    try {
+      execFileSync('ffmpeg', ['-y', '-v', 'error', '-f', 'concat', '-safe', '0', '-i', list,
+        '-vf', 'scale=-2:1440:flags=lanczos,pad=2560:1440:(ow-iw)/2:0:color=#0b0f14',
+        '-c:v', 'libx264', '-preset', 'slow', '-crf', '16', '-pix_fmt', 'yuv420p',
+        '-fps_mode', 'cfr', '-r', '30', '-movflags', '+faststart', '-an', hi]);
+      const span = shots[shots.length - 1].t - shots[0].t;
+      console.log(`hi-res: ${shots.length} frames over ${span.toFixed(1)}s ` +
+        `(~${(shots.length / span).toFixed(1)}fps captured at ${W * 2}x${H * 2})`);
+      console.log(`master: ${hi}`);
+      hiOk = true;
+    } catch (e) {
+      console.log(`hi-res build FAILED (${e.message.split('\n')[0]}) — falling back to the webm`);
+    }
+  } else {
+    console.log(`hi-res: only ${shots.length} frames captured — falling back to the webm`);
+  }
   const vid = readdirSync(OUT).find((f) => f.endsWith('.webm'));
   const webm = join(OUT, 'helm-demo-raw-uncorrected.webm');
   if (vid) {
@@ -628,15 +696,21 @@ try {
     // -itsscale puts the muxer's nominal timestamps back on the wall clock the
     // take actually ran on: every frame is kept, in order, nothing is cut — the
     // take just plays at the speed it happened at instead of ~10% slow.
-    const mp4 = join(OUT, 'helm-demo.mp4');
+    const mp4 = join(OUT, hiOk ? 'helm-demo-lowres-fallback.mp4' : 'helm-demo.mp4');
     try {
       const raw = probe(webm);
       let k = wallSec / raw;
       if (!(k > 0.5 && k < 1.5)) { beat(`  !! odd timebase ratio ${k.toFixed(3)} — leaving it alone`); k = 1; }
       console.log(`timebase: recorded ${clock(Math.round(raw))} of frames over ` +
         `${clock(Math.round(wallSec))} of wall clock — playing back at x${(1 / k).toFixed(3)}, corrected`);
+      // 2560x1440, 16:9, pillarboxed in the page's own background. YouTube picks
+      // its transcode ladder off the frame height: at 1000px it caps out around
+      // 720p, and text is the first thing that tier throws away. Handing it a
+      // 1440p frame buys several times the bitrate for the same picture.
+      const vf = `scale=-2:${1440}:flags=lanczos,pad=2560:1440:(ow-iw)/2:0:color=#0b0f14`;
       execFileSync('ffmpeg', ['-y', '-v', 'error', '-itsscale', k.toFixed(6), '-i', webm,
-        '-c:v', 'libx264', '-preset', 'slow', '-crf', '20', '-pix_fmt', 'yuv420p',
+        '-vf', vf,
+        '-c:v', 'libx264', '-preset', 'slow', '-crf', '16', '-pix_fmt', 'yuv420p',
         '-fps_mode', 'cfr', '-r', '30', '-movflags', '+faststart', '-an', mp4]);
       console.log(`mp4:   ${mp4}   (real time)`);
       console.log(`webm:  ${webm}   (raw recorder output — runs long, DO NOT submit)`);
