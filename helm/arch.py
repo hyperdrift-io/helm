@@ -78,6 +78,7 @@ button[disabled] { border-color:var(--line); color:var(--dim); cursor:wait; back
 #verdict { border:1px solid var(--line); background:var(--panel); padding:.7rem .9rem;
            margin:1.6rem 0 0; white-space:pre-wrap; color:var(--dim); font-size:.8rem; }
 #verdict[data-v] { color:var(--ok); border-color:#26402c; }
+#verdict[data-working] { color:var(--gold); border-color:#3d3011; }
 
 #stream { list-style:none; margin:.2rem 0 0; padding:0; max-height:24rem; overflow-y:auto;
           border:1px solid var(--line); background:var(--panel); }
@@ -295,14 +296,24 @@ function verdict(text){
   const el = document.getElementById('verdict');
   const m = t.match(/VERDICT:\s*([\w-]+)/);
   if(m) el.dataset.v = m[1]; else delete el.dataset.v;
+  delete el.dataset.working;
   el.textContent = t;
+}
+// While a cycle is in flight the last verdict is stale — and a panel reading
+// "stood-down" under boxes lighting up for a live action reads as a system
+// contradicting itself. Say what is actually happening instead.
+function working(){
+  const el = document.getElementById('verdict');
+  delete el.dataset.v;
+  el.dataset.working = '';
+  el.textContent = 'A cycle is in flight — the crew is working. The verdict lands when it closes.';
 }
 
 function animate(r){
   const k = r.kind;
   light('led');
   if(k === 'event'){ light('src'); fireEdge('src','led',120); }
-  else if(k === 'cycle_start'){ light('cmd'); fireEdge('src','cmd'); fireEdge('cmd','led',320); }
+  else if(k === 'cycle_start'){ working(); light('cmd'); fireEdge('src','cmd'); fireEdge('cmd','led',320); }
   else if(k === 'tool_call'){
     const who = AGENT[r.agent];
     if(who) light(who);
