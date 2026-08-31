@@ -86,6 +86,37 @@ audit trail survives a restart and streams live to the page. The same code runs
 self-hosted with a jsonl ledger: the MCP tool surface is the contract, and ADK
 plus Gemini are its first automated client.
 
+## What we learned
+
+**A control on a call site is a promise. On the boundary it is a property.** We
+built the armor screen and called it from the one place we were thinking about
+— the probe body. Then we wrote publicly that the surface quarantines
+instruction-shaped content, and a review of our own claim found fleet status,
+the analytics rows and GitHub's error text all going back to the model
+unscreened. The screen was real; the guarantee was not. It now sits on tool
+registration, so a tool written next week is armoured whether or not its author
+remembers this paragraph. If a security property depends on reviewers noticing,
+it is not a property.
+
+**Defence that destroys context creates the next failure.** Our first fix
+replaced any matched payload wholesale. That looked safe and broke the crew:
+the ledger stores what armor caught, so every read of recent actions matched
+the filter and erased itself, blinding the agent to its own history. The cycle
+still passed — it healed the service — which is exactly why we nearly shipped
+it. Now the screen strikes out the imperative and leaves the evidence: status,
+latency and the surrounding record survive. A filter that removes the attack
+and the information is a denial of service you built yourself.
+
+**Identity is enforced by what an agent can hold, not what it is told.** Every
+prompt-level rule we wrote for the Watch Officer was one clever sentence away
+from being renegotiated. Fixing its toolset with an MCP `tool_filter` ended the
+argument, because there is no verb in the room to reach for.
+
+**An agent that trusts an API's acknowledgement has not verified anything.**
+Cloud Run returning "accepted" means the request parsed. We made the Engineer
+read the config back after every action, and that is the difference between a
+demo that reports success and a crew you would leave running.
+
 ## Spin-up instructions
 ```sh
 git clone https://github.com/hyperdrift-io/helm && cd helm
@@ -107,10 +138,30 @@ their PostHog analytics projects, and the fleet-operations concepts this work
 reimagines. Standard open-source libraries used per their licences.
 
 ## Pre-send checklist
-- [x] Repo public
-- [x] Architecture diagram (served + in repo)
-- [x] Hosted URL live, all drills verified in production
-- [x] GITHUB_TOKEN (org-scoped, Issues RW) wired — verified: agent filed issue #3 from prod
-- [ ] Demo video recorded (see RECORDING.md) and uploaded
-- [ ] `scripts/reset-demo.sh` run immediately before recording
+
+Checked against the official rules (allthingsagentichackathon.devpost.com/rules),
+not from memory.
+
+**Required artifacts**
+- [x] Hosted project URL — live, all drills verified in production
+- [x] Code repository — public, so `testing@devpost.com` and
+      `cloudhackathons@google.com` already have access; no invite needed
+- [x] Text description — features, technologies, data sources **and learnings**
+- [x] Architecture diagram — live page + static SVG, in repo and served
+- [x] Setup instructions — step-by-step in `README.md`
+- [ ] Demonstration video — see below
+
+**Video rules (each one is a disqualification risk, not a preference)**
+- [ ] **≤ 4 minutes.** "If it is longer than 4 minutes, only the first 4 minutes
+      may be evaluated" — anything after the cut is not judged
+- [ ] Uploaded to **YouTube or Vimeo**, set **public**, link on the submission form
+- [x] English, or English subtitles — satisfied by the burned-in captions
+- [ ] Shows the problem, the value, and a live demo
+- [ ] Shows **unedited live execution proof** (streaming ledger / UI changes)
+- [ ] Shows **visual confirmation the backend runs on Google Cloud** — real
+      `gcloud run services describe` output, on screen
+
+**Before recording**
+- [x] GITHUB_TOKEN (org-scoped, Issues RW) wired — agent filed issues from prod
+- [ ] `scripts/reset-demo.sh` run immediately before the take
 - [ ] Founder review gate approved
