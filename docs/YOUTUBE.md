@@ -3,8 +3,9 @@
 **Published: https://youtu.be/EFiuYDQqPDw** (public, 2026-08-31)
 
 Video: `capture/2026-08-31T01-36-42/helm-demo.mp4` · 3:39 · 36 MB · 1440×1000
-Channel: **Yann VR** (published there, not the Hyperdrift channel). Visibility: **Public** (the contest rules require it —
-unlisted does not satisfy "publicly visible").
+Channel: **Yann VR** — not the Hyperdrift channel.
+Visibility: **Public** (the rules require it — unlisted does not satisfy
+"publicly visible").
 
 ---
 
