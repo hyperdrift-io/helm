@@ -93,7 +93,13 @@ Chapters
 2:29 Drill three — a real traffic surge, capacity not defence
 3:13 Google's own audit trail
 3:28 The card agrees — and the watchers carry on alone
+
+#AllThingsAgenticHackathon #AIAgents #GoogleCloud #Gemini #CloudRun #PromptInjection
 ```
+
+YouTube surfaces the **first three** hashtags above the title, which is why the
+contest one leads. The rules only require the hashtag on the social post, not
+here — it costs nothing and helps the entry be found.
 
 ---
 
