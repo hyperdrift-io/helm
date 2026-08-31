@@ -9,6 +9,7 @@ Run directly: python -m helm.fleet_mcp
 
 from __future__ import annotations
 
+import functools
 import json
 import os
 import re
@@ -37,6 +38,23 @@ def _screen(text: str, source: str) -> str:
                  note="instruction-shaped content in probe result quarantined")
     return "[armor: quarantined instruction-shaped content from this response]"
 
+
+def _tool(fn):
+    """Register a tool whose result is screened on the way back to the model.
+
+    The screen belongs on the boundary, not on the call sites that happen to
+    remember it. Every string this surface hands back — a probe body, an
+    analytics row, an API's error text — crosses here first, so a tool added
+    later is armoured by construction rather than by whoever reviews it.
+    """
+
+    @functools.wraps(fn)
+    def screened(*args, **kwargs):
+        return _screen(fn(*args, **kwargs), source=f"{fn.__name__} result")
+
+    return mcp.tool()(screened)
+
+
 FLEET = {
     "revela": {"url": "https://revela.club", "about": "photo-club product", "posthog": 169020},
     "nextrole": {"url": "https://nextrole.site", "about": "CV / application helper", "posthog": 163996},
@@ -53,7 +71,7 @@ ISSUE_REPO = os.environ.get("HELM_ISSUE_REPO", "hyperdrift-io/helm")
 mcp = FastMCP("fleet")
 
 
-@mcp.tool()
+@_tool
 def get_fleet_status() -> str:
     """Probe every live fleet app: HTTP status and latency, right now."""
     out = {}
@@ -68,7 +86,7 @@ def get_fleet_status() -> str:
     return json.dumps(out)
 
 
-@mcp.tool()
+@_tool
 def get_app_detail(app: str) -> str:
     """Deeper read of one app: headers, size, redirect chain — the scan we have."""
     info = FLEET.get(app)
@@ -88,7 +106,7 @@ def get_app_detail(app: str) -> str:
         return json.dumps({"app": app, "error": f"{type(e).__name__}: {e}"})
 
 
-@mcp.tool()
+@_tool
 def file_github_issue(title: str, body: str, labels: list[str] | None = None) -> str:
     """File a real GitHub issue on the ops repo. Use for incidents that need
     a human or a follow-up build; include evidence in the body."""
@@ -127,7 +145,7 @@ def posthog_window(project: int, hours: int, offset_hours: int = 0) -> dict | No
     return dict(zip(["events", "pageviews", "exceptions", "visitors"], row))
 
 
-@mcp.tool()
+@_tool
 def get_app_signals(app: str) -> str:
     """Real product analytics for one app (PostHog): last 24h vs the 24h
     before — traffic, exceptions, visitors. Use to judge whether an incident
@@ -143,7 +161,7 @@ def get_app_signals(app: str) -> str:
         return json.dumps({"app": app, "error": f"{type(e).__name__}: {e}"})
 
 
-@mcp.tool()
+@_tool
 def heal_service(app: str) -> str:
     """Run the healing runbook for an app. Only apps with a wired runbook can
     be healed; everything else needs a human — file an issue instead."""
@@ -190,7 +208,7 @@ def _run_service_op(service: str, op: str, max_instances: int = 0) -> dict:
             "state": "submitted — verify with get_service_config in a moment"}
 
 
-@mcp.tool()
+@_tool
 def get_service_config(app: str) -> str:
     """Read the live Cloud Run config of an operable service: ingress state
     and max instances. Use to verify take_offline / bring_online / scale_service."""
@@ -212,7 +230,7 @@ def get_service_config(app: str) -> str:
         return json.dumps({"error": f"{type(e).__name__}: {e}"})
 
 
-@mcp.tool()
+@_tool
 def take_offline(app: str) -> str:
     """Defensive shutdown: make a service publicly unreachable (Cloud Run
     ingress restricted) while it stays deployed. For active attacks. Only
@@ -223,7 +241,7 @@ def take_offline(app: str) -> str:
         return json.dumps({"done": False, "reason": f"{type(e).__name__}: {e}"})
 
 
-@mcp.tool()
+@_tool
 def bring_online(app: str) -> str:
     """Restore public ingress for a service previously taken offline."""
     try:
@@ -232,7 +250,7 @@ def bring_online(app: str) -> str:
         return json.dumps({"done": False, "reason": f"{type(e).__name__}: {e}"})
 
 
-@mcp.tool()
+@_tool
 def scale_service(app: str, max_instances: int) -> str:
     """Scale a service for a traffic surge: raise (or later lower) its
     Cloud Run max instances (1–10). Only allowlisted drill assets."""
@@ -242,7 +260,7 @@ def scale_service(app: str, max_instances: int) -> str:
         return json.dumps({"done": False, "reason": f"{type(e).__name__}: {e}"})
 
 
-@mcp.tool()
+@_tool
 def get_recent_actions(limit: int = 15) -> str:
     """What Helm has seen and done recently — read this before acting so
     decisions build on prior ones instead of repeating them."""
