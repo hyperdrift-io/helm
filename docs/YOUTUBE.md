@@ -1,7 +1,8 @@
 # YouTube listing — paste-ready
 
-**Currently published (1x capture, superseded): https://youtu.be/EFiuYDQqPDw**
-**To upload: the 2x master below — replaces it.**
+**Published: https://youtu.be/JB2O3WSwH90** (public, 2x capture)
+Title used: the hook alternate — "We let an agent crew defend a live production fleet."
+Superseded: `EFiuYDQqPDw` (1x capture) and `xlRSTKcKH6I` (first upload, wrong channel).
 
 Video: `capture/2026-08-31T04-36-38/helm-demo.mp4` · 3:41 · 68 MB · 2560x1440
 Captured at 2880x2000 over CDP screencast (7,723 frames, ~35fps), encoded crf 16.
